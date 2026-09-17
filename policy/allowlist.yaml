@@ -1,0 +1,23 @@
+# Runtime policy. Re-checked before every mutating action.
+allowed_origins:
+  - http://127.0.0.1:8765
+  - http://localhost:8765
+
+allowed_actions:
+  - goto
+  - click
+  - type
+  - clear_and_type
+  - select
+  - press_key
+  - dismiss
+  - extract
+  - wait_until
+
+# Visible control names that are treated as irreversible (HITL required).
+irreversible_name_patterns:
+  - Transfer
+  - Delete
+  - Wire
+  - Close account
+  - Submit payment

@@ -1,0 +1,14 @@
+{
+  "kind": "business_outcome",
+  "code": "member_not_found",
+  "capability_id": "local.mock_core.lookup_savings_balance",
+  "capability_version": "1.0.0",
+  "run_id": "replay-bb84c579",
+  "outputs": {},
+  "failed_step_id": "s4_search",
+  "expected": null,
+  "observed": null,
+  "evidence_ref": "C:\\Users\\prath\\computer-use-automation\\evidence\\replay-bb84c579",
+  "control": "agent",
+  "message": "member_not_found"
+}

@@ -1,0 +1,17 @@
+{
+  "kind": "success",
+  "code": "success",
+  "capability_id": "local.mock_core.lookup_savings_balance",
+  "capability_version": "1.0.0",
+  "run_id": "replay-ac602cd2",
+  "outputs": {
+    "savingsBalance": "1840.22",
+    "memberName": "Jane Doe"
+  },
+  "failed_step_id": null,
+  "expected": null,
+  "observed": null,
+  "evidence_ref": "C:\\Users\\prath\\computer-use-automation\\evidence\\replay-ac602cd2",
+  "control": "agent",
+  "message": "ok"
+}

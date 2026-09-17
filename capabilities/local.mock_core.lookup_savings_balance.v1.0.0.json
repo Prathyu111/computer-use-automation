@@ -1,0 +1,344 @@
+{
+  "schema_version": "capability/v1",
+  "id": "local.mock_core.lookup_savings_balance",
+  "version": "1.0.0",
+  "title": "Look up member savings balance",
+  "description": "Open member lookup, search by member ID, return current savings balance. Unknown members are a business outcome, not a crash.",
+  "status": "draft",
+  "app": {
+    "vendor": "local",
+    "product": "mock_core",
+    "surface_kind": "web",
+    "compat": "v1"
+  },
+  "tenant": null,
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "sensitivity": "identifier",
+      "description": "Member identifier supplied per invocation",
+      "example_placeholder": "<memberId>"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savingsBalance",
+      "type": "money",
+      "required": true,
+      "sensitivity": "none",
+      "description": "Current savings balance as displayed",
+      "example_placeholder": null
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "Member display name; returned to caller, not stored in logs as raw PII",
+      "example_placeholder": null
+    }
+  ],
+  "outcomes": [
+    {
+      "kind": "success",
+      "code": "success",
+      "description": "Balance extracted"
+    },
+    {
+      "kind": "business_outcome",
+      "code": "member_not_found",
+      "description": "No member matches the id"
+    },
+    {
+      "kind": "business_outcome",
+      "code": "permission_denied",
+      "description": "Operator is not allowed to view this member"
+    },
+    {
+      "kind": "business_outcome",
+      "code": "validation_rejected",
+      "description": "Lookup form validation failed"
+    },
+    {
+      "kind": "hard_failure",
+      "code": "failed",
+      "description": "Automation error"
+    },
+    {
+      "kind": "escalated",
+      "code": "escalated",
+      "description": "Human took control"
+    }
+  ],
+  "entry": "http://127.0.0.1:8765/",
+  "auth": "assumed_present",
+  "allowlist_ref": "policy/allowlist.yaml",
+  "irreversible_step_ids": [],
+  "steps": [
+    {
+      "id": "s1_goto_entry",
+      "action": "goto",
+      "target": null,
+      "value_from": null,
+      "extract_to": null,
+      "url": "http://127.0.0.1:8765/",
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": {
+        "description": "Lookup form",
+        "heading_contains": "Member lookup",
+        "text_contains": null,
+        "url_contains": null
+      },
+      "handlers": [],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s2_dismiss_interstitial",
+      "action": "dismiss",
+      "target": {
+        "intent": "System notification OK",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "a11y",
+            "role": "button",
+            "name": "OK",
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": null,
+            "target_cell": null
+          },
+          {
+            "kind": "css",
+            "role": null,
+            "name": null,
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": ".overlay button",
+            "row_key_cell": null,
+            "row_key": null,
+            "target_cell": null
+          }
+        ]
+      },
+      "value_from": null,
+      "extract_to": null,
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": null,
+      "handlers": [],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s3_type_member_id",
+      "action": "clear_and_type",
+      "target": {
+        "intent": "Member ID field",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "labeled_control",
+            "role": null,
+            "name": null,
+            "label": "Member ID",
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": null,
+            "target_cell": null
+          },
+          {
+            "kind": "a11y",
+            "role": "textbox",
+            "name": "Member ID",
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": null,
+            "target_cell": null
+          }
+        ]
+      },
+      "value_from": "$input.memberId",
+      "extract_to": null,
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": null,
+      "handlers": [],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s4_search",
+      "action": "click",
+      "target": {
+        "intent": "Search",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "a11y",
+            "role": "button",
+            "name": "Search",
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": null,
+            "target_cell": null
+          }
+        ]
+      },
+      "value_from": null,
+      "extract_to": null,
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": {
+        "description": "Account summary or known outcome",
+        "heading_contains": null,
+        "text_contains": null,
+        "url_contains": null
+      },
+      "handlers": [
+        {
+          "when": {
+            "kind": "text_matches",
+            "text": "No member found",
+            "scope": null,
+            "dialog_role": null,
+            "target": null
+          },
+          "then": {
+            "action": "return_outcome",
+            "code": "member_not_found",
+            "kind": "business_outcome",
+            "recover": null,
+            "reason": null
+          }
+        },
+        {
+          "when": {
+            "kind": "text_matches",
+            "text": "You do not have permission",
+            "scope": null,
+            "dialog_role": null,
+            "target": null
+          },
+          "then": {
+            "action": "return_outcome",
+            "code": "permission_denied",
+            "kind": "business_outcome",
+            "recover": null,
+            "reason": null
+          }
+        },
+        {
+          "when": {
+            "kind": "text_matches",
+            "text": "Member ID is required",
+            "scope": null,
+            "dialog_role": null,
+            "target": null
+          },
+          "then": {
+            "action": "return_outcome",
+            "code": "validation_rejected",
+            "kind": "business_outcome",
+            "recover": null,
+            "reason": null
+          }
+        }
+      ],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s5_extract_balance",
+      "action": "extract",
+      "target": {
+        "intent": "Current savings balance",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "structural",
+            "role": null,
+            "name": null,
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": "Savings",
+            "target_cell": 1
+          }
+        ]
+      },
+      "value_from": null,
+      "extract_to": "savingsBalance",
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": null,
+      "handlers": [],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s6_extract_name",
+      "action": "extract",
+      "target": {
+        "intent": "Member name",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "structural",
+            "role": null,
+            "name": null,
+            "label": null,
+            "text": null,
+            "scope": null,
+            "css": null,
+            "row_key_cell": null,
+            "row_key": "Name",
+            "target_cell": 1
+          }
+        ]
+      },
+      "value_from": null,
+      "extract_to": "memberName",
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": null,
+      "handlers": [],
+      "timeout_ms": 8000
+    }
+  ],
+  "success": {
+    "description": "Account summary with savings row",
+    "heading_contains": "Account summary",
+    "text_contains": "Savings",
+    "url_contains": null
+  },
+  "provenance": {
+    "discovery_run_id": "seed",
+    "model_id": null,
+    "created_at": null
+  }
+}
