@@ -1,0 +1,11 @@
+{"ts": "2026-09-18T21:30:55.464084+00:00", "run_id": "replay-c4d0861b", "event": "start", "capability": "local.mock_core.lookup_savings_balance", "params": {"memberId": "9\u20269"}}
+{"ts": "2026-09-18T21:30:57.704167+00:00", "run_id": "replay-c4d0861b", "event": "policy", "step": "s1_goto_entry", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:30:57.705037+00:00", "run_id": "replay-c4d0861b", "event": "step_start", "step": "s1_goto_entry", "action": "goto"}
+{"ts": "2026-09-18T21:30:57.897334+00:00", "run_id": "replay-c4d0861b", "event": "policy", "step": "s2_dismiss", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:30:57.899448+00:00", "run_id": "replay-c4d0861b", "event": "step_start", "step": "s2_dismiss", "action": "dismiss"}
+{"ts": "2026-09-18T21:30:57.972387+00:00", "run_id": "replay-c4d0861b", "event": "dismiss", "step": "s2_dismiss", "status": "dismissed"}
+{"ts": "2026-09-18T21:30:57.973734+00:00", "run_id": "replay-c4d0861b", "event": "policy", "step": "s3_type", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:30:57.974324+00:00", "run_id": "replay-c4d0861b", "event": "step_start", "step": "s3_type", "action": "clear_and_type"}
+{"ts": "2026-09-18T21:30:58.036737+00:00", "run_id": "replay-c4d0861b", "event": "policy", "step": "s4_click", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:30:58.038519+00:00", "run_id": "replay-c4d0861b", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-18T21:30:58.243433+00:00", "run_id": "replay-c4d0861b", "event": "handler", "step": "s4_click", "then": "return_outcome", "code": "member_not_found"}

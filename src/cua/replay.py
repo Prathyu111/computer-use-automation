@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from cua.adapter import SurfaceAdapter
@@ -9,6 +10,7 @@ from cua.evidence import EvidenceSink
 from cua.hitl import HumanIntervention
 from cua.models import (
     Capability,
+    Checkpoint,
     ControlLock,
     Handler,
     ResultKind,
@@ -18,6 +20,32 @@ from cua.models import (
 from cua.policy import PolicyGate
 from cua.redact import redact_value
 from cua.session import Session
+
+_MAX_RECOVER = 2
+_MONEY = re.compile(r"^-?\d+(?:\.\d+)?$")
+
+
+def coerce_output(type_name: str, raw: str) -> str:
+    text = (raw or "").strip()
+    kind = (type_name or "string").lower()
+    if kind == "money":
+        cleaned = text.replace("$", "").replace(",", "").strip()
+        if not _MONEY.fullmatch(cleaned):
+            raise ValueError(f"not a money value: {raw!r}")
+        return f"{float(cleaned):.2f}"
+    if kind == "number":
+        cleaned = text.replace(",", "").strip()
+        float(cleaned)
+        return cleaned
+    if not text:
+        raise ValueError("empty string")
+    return text
+
+
+def _meaningful_checkpoint(cp: Checkpoint | None) -> bool:
+    if cp is None:
+        return False
+    return bool(cp.heading_contains or cp.text_contains or cp.url_contains)
 
 
 class ReplayEngine:
@@ -41,24 +69,50 @@ class ReplayEngine:
         self.hitl = hitl
         self.run_id = run_id
         self.outputs: dict[str, Any] = {}
+        self._irreversible_ids = set(capability.irreversible_step_ids)
+        self._hitl_retried: set[str] = set()
 
     def run(self) -> RunResult:
         self._validate_inputs()
         for step in self.cap.steps:
             if not self.session.can_act():
                 return self._result(ResultKind.escalated, "escalated", "session lock is not agent")
-            decision = self.policy.check_step(step, self.session.current_url())
+            decision = self.policy.check_step(
+                step, self.session.current_url(), self._irreversible_ids
+            )
             self.evidence.log("policy", step=step.id, allowed=decision.allowed, reason=decision.reason)
             if not decision.allowed:
                 return self._fail(step, "policy deny", decision.reason)
             if decision.require_hitl:
-                lock = self.hitl.request(decision.reason, step_id=step.id)
-                if lock is not ControlLock.agent:
+                outcome = self.hitl.request(
+                    decision.reason,
+                    step_id=step.id,
+                    mode="approve",
+                    require_value=step.action == "extract",
+                )
+                if outcome.lock is not ControlLock.agent:
                     return self._result(ResultKind.escalated, "escalated", decision.reason, step=step)
+                if outcome.human_completed:
+                    if step.action == "extract":
+                        supplied = (outcome.value or "").strip()
+                        if not supplied:
+                            return self._fail(
+                                step,
+                                "extract requires a value",
+                                "HITL done without extracted value",
+                            )
+                        if step.extract_to:
+                            self.outputs[step.extract_to] = supplied
+                        continue
+                    self.evidence.log("step_skipped_human", step=step.id)
+                    continue
 
             outcome = self._run_step(step)
             if outcome is not None:
                 return outcome
+            off = self._origin_failure(step)
+            if off is not None:
+                return off
 
         if not self.adapter.checkpoint_ok(
             self.cap.success.heading_contains,
@@ -73,23 +127,10 @@ class ReplayEngine:
                 expected=self.cap.success.description,
                 observed=obs.heading or obs.body_text[:200],
             )
-        for spec in self.cap.outputs:
-            if spec.required and spec.name not in self.outputs:
-                return self._result(
-                    ResultKind.hard_failure,
-                    "failed",
-                    f"missing required output {spec.name}",
-                )
-        safe_outputs = {}
-        for spec in self.cap.outputs:
-            if spec.name in self.outputs:
-                val = str(self.outputs[spec.name])
-                self.evidence.log(
-                    "output",
-                    name=spec.name,
-                    value=redact_value(spec.name, val, spec.sensitivity),
-                )
-                safe_outputs[spec.name] = self.outputs[spec.name]
+        try:
+            safe_outputs = self._finalize_outputs()
+        except ValueError as exc:
+            return self._result(ResultKind.hard_failure, "failed", str(exc), expected="typed outputs")
         return self._result(ResultKind.success, "success", "ok", outputs=safe_outputs)
 
     def _run_step(self, step: Step) -> RunResult | None:
@@ -97,9 +138,10 @@ class ReplayEngine:
         self.evidence.log("step_start", step=step.id, action=step.action)
         if step.action == "dismiss":
             try:
-                self.adapter.act_step("dismiss", step.target, timeout_ms=1500)
-            except Exception:
-                self.evidence.log("recover", step=step.id, reason="no interstitial")
+                status = self.adapter.try_dismiss()
+            except Exception as exc:
+                return self._fail(step, "dismiss failed", str(exc))
+            self.evidence.log("dismiss", step=step.id, status=status)
             return None
         try:
             extracted = self.adapter.act_step(
@@ -123,17 +165,20 @@ class ReplayEngine:
         if handled is not None:
             return handled
 
-        if step.checkpoint and step.checkpoint.heading_contains:
-            # After search, either summary or a declared business banner.
-            if self.adapter.checkpoint_ok(
-                step.checkpoint.heading_contains,
-                step.checkpoint.text_contains,
-                step.checkpoint.url_contains,
-            ):
+        if _meaningful_checkpoint(step.checkpoint):
+            cp = step.checkpoint
+            assert cp is not None
+            if self.adapter.checkpoint_ok(cp.heading_contains, cp.text_contains, cp.url_contains):
                 return None
             handled = self._apply_handlers(step, checkpoint_failed=True)
             if handled is not None:
                 return handled
+            obs = self.adapter.observe()
+            return self._fail(
+                step,
+                cp.description or "checkpoint",
+                obs.heading or obs.body_text[:200],
+            )
         return None
 
     def _apply_handlers(
@@ -153,15 +198,61 @@ class ReplayEngine:
                 if then.action == "fail":
                     return self._fail(step, then.reason or "handler fail", error or "")
                 if then.action == "escalate":
-                    lock = self.hitl.request(then.reason or "handler escalate", step_id=step.id)
-                    if lock is not ControlLock.agent:
+                    outcome = self.hitl.request(
+                        then.reason or "handler escalate",
+                        step_id=step.id,
+                        mode="takeover",
+                        require_value=step.action == "extract",
+                    )
+                    if outcome.lock is not ControlLock.agent:
                         return self._result(ResultKind.escalated, "escalated", then.reason or "", step=step)
-                    return None
+                    if outcome.human_completed:
+                        if step.action == "extract":
+                            supplied = (outcome.value or "").strip()
+                            if not supplied:
+                                return self._fail(
+                                    step,
+                                    "extract requires a value",
+                                    "HITL done without extracted value",
+                                )
+                            if step.extract_to:
+                                self.outputs[step.extract_to] = supplied
+                            return None
+                        self.evidence.log("handler_human_completed", step=step.id)
+                        return None
+                    if step.id in self._hitl_retried:
+                        return self._fail(step, "still blocked after HITL", error or "")
+                    self._hitl_retried.add(step.id)
+                    return self._run_step(step)
                 if then.action == "recover":
-                    return None
-        if error:
-            return None
+                    recovered = self._recover(step, then.recover or "retry", error)
+                    if recovered is not None:
+                        return recovered
+                    return self._apply_handlers(step)
         return None
+
+    def _recover(self, step: Step, kind: str, error: str | None) -> RunResult | None:
+        last = error or "recover"
+        for attempt in range(1, _MAX_RECOVER + 1):
+            self.evidence.log("recover", step=step.id, recover=kind, attempt=attempt)
+            try:
+                if kind == "dismiss":
+                    status = self.adapter.try_dismiss()
+                    self.evidence.log("recover_dismiss", step=step.id, status=status, attempt=attempt)
+                extracted = self.adapter.act_step(
+                    step.action,
+                    step.target,
+                    value=self._resolve_value(step.value_from),
+                    url=step.url,
+                    key=step.key,
+                    timeout_ms=step.timeout_ms,
+                )
+                if step.extract_to and extracted is not None:
+                    self.outputs[step.extract_to] = extracted
+                return None
+            except Exception as exc:
+                last = str(exc)
+        return self._fail(step, "recovery exhausted", last)
 
     def _when_matches(
         self,
@@ -196,6 +287,34 @@ class ReplayEngine:
         for spec in self.cap.inputs:
             if spec.required and spec.name not in self.params:
                 raise ValueError(f"missing required input {spec.name}")
+
+    def _finalize_outputs(self) -> dict[str, Any]:
+        safe: dict[str, Any] = {}
+        for spec in self.cap.outputs:
+            raw = self.outputs.get(spec.name)
+            if raw is None:
+                if spec.required:
+                    raise ValueError(f"missing required output {spec.name}")
+                continue
+            try:
+                coerced = coerce_output(spec.type, str(raw))
+            except (ValueError, TypeError) as exc:
+                if spec.required:
+                    raise ValueError(f"invalid {spec.type} output {spec.name}: {exc}") from exc
+                continue
+            self.evidence.log(
+                "output",
+                name=spec.name,
+                value=redact_value(spec.name, coerced, spec.sensitivity),
+            )
+            safe[spec.name] = coerced
+        return safe
+
+    def _origin_failure(self, step: Step) -> RunResult | None:
+        url = self.session.current_url()
+        if self.policy.origin_allowed(url):
+            return None
+        return self._fail(step, "origin allowlist after navigation", url)
 
     def _fail(self, step: Step, expected: str, observed: str) -> RunResult:
         self._snapshot("failure")

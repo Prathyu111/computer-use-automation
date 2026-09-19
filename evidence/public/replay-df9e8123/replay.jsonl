@@ -1,0 +1,18 @@
+{"ts": "2026-09-18T22:37:56.177225+00:00", "run_id": "replay-df9e8123", "event": "start", "capability": "local.mock_core.lookup_savings_balance", "params": {"memberId": "1\u20261"}}
+{"ts": "2026-09-18T22:37:58.090128+00:00", "run_id": "replay-df9e8123", "event": "policy", "step": "s1_goto_entry", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:37:58.090818+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s1_goto_entry", "action": "goto"}
+{"ts": "2026-09-18T22:37:58.217666+00:00", "run_id": "replay-df9e8123", "event": "policy", "step": "s2_dismiss", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:37:58.218303+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s2_dismiss", "action": "dismiss"}
+{"ts": "2026-09-18T22:37:58.292093+00:00", "run_id": "replay-df9e8123", "event": "dismiss", "step": "s2_dismiss", "status": "dismissed"}
+{"ts": "2026-09-18T22:37:58.293412+00:00", "run_id": "replay-df9e8123", "event": "policy", "step": "s3_type", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:37:58.294525+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s3_type", "action": "clear_and_type"}
+{"ts": "2026-09-18T22:37:58.342370+00:00", "run_id": "replay-df9e8123", "event": "policy", "step": "s4_click", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:37:58.343004+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-18T22:37:58.470413+00:00", "run_id": "replay-df9e8123", "event": "handler", "step": "s4_click", "then": "escalate", "code": null}
+{"ts": "2026-09-18T22:37:58.475382+00:00", "run_id": "replay-df9e8123", "event": "hitl_request", "reason": "Supervisor approval required", "step_id": "s4_click", "mode": "takeover", "url_before": "http://127.0.0.1:[REDACTED]/", "heading_before": "Member lookup", "lock": "human"}
+{"ts": "2026-09-18T22:38:11.379310+00:00", "run_id": "replay-df9e8123", "event": "hitl_resume", "mode": "takeover"}
+{"ts": "2026-09-18T22:38:11.386638+00:00", "run_id": "replay-df9e8123", "event": "hitl_after", "human_completed": false, "url_after": "http://127.0.0.1:[REDACTED]/", "heading_after": "Member lookup", "lock": "agent"}
+{"ts": "2026-09-18T22:38:11.528369+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-18T22:38:11.886820+00:00", "run_id": "replay-df9e8123", "event": "policy", "step": "s5_extract", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:38:11.887550+00:00", "run_id": "replay-df9e8123", "event": "step_start", "step": "s5_extract", "action": "extract"}
+{"ts": "2026-09-18T22:38:11.991559+00:00", "run_id": "replay-df9e8123", "event": "output", "name": "savingsBalance", "value": "2\u20260"}

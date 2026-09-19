@@ -8,9 +8,14 @@ from urllib.parse import parse_qs, urlparse
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
+HITL_MEMBER_ID = "11111"
+
 MEMBERS = {
     "12345": {"name": "Jane Doe", "savings": "1840.22"},
+    HITL_MEMBER_ID: {"name": "Alex Rivera", "savings": "250.00"},
 }
+
+HITL_DIALOG_TEXT = "Supervisor approval required"
 
 
 def _page(title: str, heading: str, body: str, overlay: bool = False) -> bytes:
@@ -67,10 +72,51 @@ def lookup_form(message: str | None = None, overlay: bool = False) -> bytes:
         <td><input aria-label="Member ID" name="member_id" size="16"/></td>
       </tr>
       <tr>
-        <td colspan="2"><button type="button" onclick="var v=document.querySelector('input[name=member_id]').value; location='/lookup?member_id='+encodeURIComponent(v)">Search</button></td>
+        <td colspan="2"><button type="button" id="search-btn">Search</button></td>
       </tr>
     </table>
     <p>Use the member identifier from the servicing ticket.</p>
+    <script>
+      (function () {{
+        var search = document.getElementById('search-btn');
+        if (!search) return;
+        var acknowledged = false;
+        var supervisorOk = false;
+        var hitlId = {HITL_MEMBER_ID!r};
+        search.addEventListener('click', function (e) {{
+          var v = document.querySelector('input[name=member_id]').value;
+          if (v === hitlId && !supervisorOk) {{
+            e.preventDefault();
+            e.stopPropagation();
+            if (document.querySelector('.overlay[data-hitl]')) return;
+            var hitl = document.createElement('div');
+            hitl.className = 'overlay';
+            hitl.setAttribute('role', 'alertdialog');
+            hitl.setAttribute('data-hitl', '1');
+            hitl.innerHTML = '<div class="overlay-card"><p>{HITL_DIALOG_TEXT}</p><p>Human acknowledgement required.</p><button type="button">OK</button></div>';
+            hitl.querySelector('button').addEventListener('click', function () {{
+              supervisorOk = true;
+              hitl.remove();
+            }});
+            document.body.appendChild(hitl);
+            return;
+          }}
+          if (acknowledged || v === hitlId) {{
+            location = '/lookup?member_id=' + encodeURIComponent(v);
+            return;
+          }}
+          e.preventDefault();
+          e.stopPropagation();
+          acknowledged = true;
+          var overlay = document.createElement('div');
+          overlay.className = 'overlay';
+          overlay.setAttribute('role', 'alertdialog');
+          overlay.innerHTML = '<div class="overlay-card"><p>Please acknowledge this notice</p><button type="button">OK</button></div>';
+          overlay.querySelector('button').addEventListener('click', function () {{ overlay.remove(); }});
+          document.body.appendChild(overlay);
+        }});
+      }})();
+    </script>
     """
     return _page("Member lookup", "Member lookup", body, overlay=overlay)
 
@@ -110,6 +156,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if member_id == "40301":
                 self._ok(lookup_form("You do not have permission to view this member."))
+                return
+            if member_id == "00000":
+                self._ok(lookup_form("Session expired. Please sign in again."))
                 return
             rec = MEMBERS.get(member_id)
             if not rec:

@@ -37,15 +37,19 @@ class ResultKind(str, Enum):
 
 
 class LocatorStrategy(BaseModel):
-    kind: Literal["a11y", "labeled_control", "name_in_scope", "structural", "css"]
+    kind: Literal[
+        "a11y",
+        "labeled_control",
+        "labeled_readonly",
+        "name_in_scope",
+        "structural",
+        "css",
+    ]
     role: str | None = None
     name: str | None = None
     label: str | None = None
     text: str | None = None
-    scope: str | None = None
     css: str | None = None
-    # structural: row whose cell 0 equals a value, then click/extract cell N
-    row_key_cell: int | None = None
     row_key: str | None = None
     target_cell: int | None = None
 
@@ -81,7 +85,6 @@ class WhenCondition(BaseModel):
         "timeout",
     ]
     text: str | None = None
-    scope: str | None = None
     dialog_role: str | None = None
     target: Target | None = None
 
@@ -117,7 +120,6 @@ class Step(BaseModel):
         "press_key",
         "dismiss",
         "extract",
-        "wait_until",
     ]
     target: Target | None = None
     value_from: str | None = None  # $input.memberId or literal
@@ -147,6 +149,7 @@ class Provenance(BaseModel):
     discovery_run_id: str | None = None
     model_id: str | None = None
     created_at: str | None = None
+    notes: str | None = None
 
 
 class Capability(BaseModel):

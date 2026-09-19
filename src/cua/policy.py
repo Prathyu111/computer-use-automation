@@ -56,7 +56,12 @@ class PolicyGate:
             )
         return PolicyDecision(allowed=True, reason="allowlisted")
 
-    def check_step(self, step: Step, current_url: str) -> PolicyDecision:
+    def check_step(
+        self,
+        step: Step,
+        current_url: str,
+        irreversible_ids: set[str] | None = None,
+    ) -> PolicyDecision:
         if step.action not in self.allowed_actions:
             return PolicyDecision(
                 allowed=False, reason=f"action type '{step.action}' is not allowlisted"
@@ -72,11 +77,19 @@ class PolicyGate:
             name = step.target.intent
             if step.target.strategies:
                 name = step.target.strategies[0].name or step.target.strategies[0].label or name
-        irreversible = step.risk is RiskClass.irreversible or self.is_irreversible_name(name)
-        if irreversible:
+        irreversible = (
+            step.risk is RiskClass.irreversible
+            or bool(irreversible_ids and step.id in irreversible_ids)
+            or self.is_irreversible_name(name)
+        )
+        if not irreversible:
+            return PolicyDecision(allowed=True, reason="allowlisted")
+        if step.on_irreversible == "block":
             return PolicyDecision(
-                allowed=True,
-                require_hitl=True,
-                reason=f"irreversible step {step.id} requires HITL",
+                allowed=False, reason=f"irreversible step {step.id} is blocked"
             )
-        return PolicyDecision(allowed=True, reason="allowlisted")
+        return PolicyDecision(
+            allowed=True,
+            require_hitl=True,
+            reason=f"irreversible step {step.id} requires HITL",
+        )

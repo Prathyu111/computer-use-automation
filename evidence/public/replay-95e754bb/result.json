@@ -1,0 +1,14 @@
+{
+  "kind": "hard_failure",
+  "code": "session_expired",
+  "capability_id": "local.mock_core.lookup_savings_balance",
+  "capability_version": "1.0.0",
+  "run_id": "replay-95e754bb",
+  "outputs": {},
+  "failed_step_id": "s4_click",
+  "expected": null,
+  "observed": null,
+  "evidence_ref": "evidence/replay-95e754bb",
+  "control": "agent",
+  "message": "session_expired"
+}

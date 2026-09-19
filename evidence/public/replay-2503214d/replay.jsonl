@@ -1,0 +1,16 @@
+{"ts": "2026-09-18T22:14:26.162974+00:00", "run_id": "replay-2503214d", "event": "start", "capability": "local.mock_core.lookup_savings_balance", "params": {"memberId": "1\u20265"}}
+{"ts": "2026-09-18T22:14:30.276629+00:00", "run_id": "replay-2503214d", "event": "policy", "step": "s1_goto_entry", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:14:30.278630+00:00", "run_id": "replay-2503214d", "event": "step_start", "step": "s1_goto_entry", "action": "goto"}
+{"ts": "2026-09-18T22:14:30.438333+00:00", "run_id": "replay-2503214d", "event": "policy", "step": "s2_dismiss", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:14:30.439471+00:00", "run_id": "replay-2503214d", "event": "step_start", "step": "s2_dismiss", "action": "dismiss"}
+{"ts": "2026-09-18T22:14:30.511424+00:00", "run_id": "replay-2503214d", "event": "dismiss", "step": "s2_dismiss", "status": "dismissed"}
+{"ts": "2026-09-18T22:14:30.512499+00:00", "run_id": "replay-2503214d", "event": "policy", "step": "s3_type", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:14:30.512940+00:00", "run_id": "replay-2503214d", "event": "step_start", "step": "s3_type", "action": "clear_and_type"}
+{"ts": "2026-09-18T22:14:30.566524+00:00", "run_id": "replay-2503214d", "event": "policy", "step": "s4_click", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:14:30.567267+00:00", "run_id": "replay-2503214d", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-18T22:14:30.718018+00:00", "run_id": "replay-2503214d", "event": "handler", "step": "s4_click", "then": "recover", "code": null}
+{"ts": "2026-09-18T22:14:30.718464+00:00", "run_id": "replay-2503214d", "event": "recover", "step": "s4_click", "recover": "dismiss", "attempt": 1}
+{"ts": "2026-09-18T22:14:30.758451+00:00", "run_id": "replay-2503214d", "event": "recover_dismiss", "step": "s4_click", "status": "dismissed", "attempt": 1}
+{"ts": "2026-09-18T22:14:31.085217+00:00", "run_id": "replay-2503214d", "event": "policy", "step": "s5_extract", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T22:14:31.085631+00:00", "run_id": "replay-2503214d", "event": "step_start", "step": "s5_extract", "action": "extract"}
+{"ts": "2026-09-18T22:14:31.128995+00:00", "run_id": "replay-2503214d", "event": "output", "name": "savingsBalance", "value": "[\u20262"}

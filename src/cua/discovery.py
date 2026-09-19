@@ -10,31 +10,33 @@ import httpx
 
 from cua.adapter import ObserveResult, SurfaceAdapter
 from cua.models import ProposedAction
+from cua.redact import redact_for_log
 
 
-SYSTEM = """You operate a legacy bank back-office UI (no APIs, no test IDs).
-You receive a compact observation (url, heading, controls, visible text, dialog).
-Return ONE JSON object with keys:
+SYSTEM = """You operate a computer UI the way a person would (legacy web is common: no APIs, no test IDs).
+You receive a goal, a compact live observation (url, heading, controls, redacted visible text, dialog), and the immediately previous attempted action with its outcome when one exists.
+Return ONE JSON object:
   type: goto | click | type | dismiss | extract | done | stuck
-  intent: short description
-  role: optional a11y role (textbox, button)
-  name: accessible or visible name
-  value: for type, the exact string to enter
-  url: for goto only
-  extract_to: for extract (savingsBalance or memberName)
+  intent: short description of this action
+  role: optional accessibility role (textbox, button)
+  name: accessible or visible name of the control
+  value: for type, the string to enter
+  url: for goto only, and only on the assigned app
+  extract_to: for extract, the output field name from the goal
   risk: reversible | irreversible
   done_reason / stuck_reason when applicable
 
 Rules:
-- Stay on the assigned app. Never invent URLs outside it.
-- Prefer role+name. Do not use CSS.
-- If a system notification overlay is visible, dismiss it first (type=dismiss).
-- For lookup: type the member id into Member ID, click Search.
-- If you see Account summary and a Savings row, extract savingsBalance then memberName, then type=done.
-- If you see "No member found", you may type=done with done_reason member_not_found.
+- Choose the next action from the goal, this observation, and the previous-action outcome if present. Do not assume a canned workflow.
+- Prefer accessibility role + name for click and type. For extract, put the visible field label in name or text (never the full intent sentence) and set extract_to to the output field from the goal, then type=done after values are read. Do not use a canned script of clicks followed by extract.
+- If last_outcome is extracted, the previous extract succeeded. You get extract_to, not the raw value; use the live observation and still emit type=done when the goal is complete.
+- Do not use CSS selectors.
+- Stay on the assigned app. Never invent off-app URLs.
+- If a blocking dialog or overlay is visible, dismiss it before doing other work.
+- If the observation already satisfies the goal, extract any requested values using field labels from the observation, then type=done.
 - If you cannot proceed safely, type=stuck with a reason.
-- Never click Transfer, Delete, Wire, or Submit payment.
-- Never include passwords or full SSN.
+- Never click Transfer, Delete, Wire, Close account, or Submit payment.
+- Never type passwords. Never include SSN, tokens, or other secrets in the JSON.
 """
 
 
@@ -45,11 +47,26 @@ class DiscoveryAgent:
         self.entry = entry
         self.model_id = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-    def decide(self, obs: ObserveResult, step_index: int) -> ProposedAction:
-        if step_index == 0 and "8765" not in obs.url and self.entry:
-            return ProposedAction(type="goto", url=self.entry, intent="open entry")
+    def decide(
+        self,
+        obs: ObserveResult,
+        step_index: int,
+        *,
+        last_action: ProposedAction | None = None,
+        last_outcome: str | None = None,
+    ) -> ProposedAction:
+        if step_index == 0 and self.entry and not obs.url.startswith(self.entry.rstrip("/")):
+            return ProposedAction(type="goto", url=self.entry, intent="open assigned entry")
         payload = self.adapter.observation_for_llm(obs)
-        user = json.dumps({"goal": self.goal, "step": step_index, "observation": payload})
+        user = json.dumps(
+            {
+                "goal": self.goal,
+                "step": step_index,
+                "observation": payload,
+                "last_action": _safe_last_action(last_action),
+                "last_outcome": last_outcome,
+            }
+        )
         raw = self._complete(user)
         data = _parse_json(raw)
         return ProposedAction.model_validate(data)
@@ -77,8 +94,19 @@ class DiscoveryAgent:
                 headers={"Authorization": f"Bearer {api_key}"},
                 json=body,
             )
-            resp.raise_for_status()
+            if resp.is_error:
+                raise RuntimeError(
+                    f"OpenAI chat/completions {resp.status_code} for model {self.model_id!r}: {resp.text}"
+                )
             return resp.json()["choices"][0]["message"]["content"]
+
+
+def _safe_last_action(action: ProposedAction | None) -> dict[str, Any] | None:
+    if action is None:
+        return None
+    dumped = action.model_dump(exclude_none=True)
+    dumped.pop("extracted", None)
+    return redact_for_log("action", dumped)
 
 
 def _parse_json(raw: str) -> dict[str, Any]:

@@ -3,15 +3,14 @@
   "code": "success",
   "capability_id": "local.mock_core.lookup_savings_balance",
   "capability_version": "1.0.0",
-  "run_id": "replay-ac602cd2",
+  "run_id": "replay-1c9f10a2",
   "outputs": {
-    "savingsBalance": "1840.22",
-    "memberName": "Jane Doe"
+    "savingsBalance": "[REDACTED].22"
   },
   "failed_step_id": null,
   "expected": null,
   "observed": null,
-  "evidence_ref": "C:\\Users\\prath\\computer-use-automation\\evidence\\replay-ac602cd2",
+  "evidence_ref": "evidence/replay-1c9f10a2",
   "control": "agent",
   "message": "ok"
 }

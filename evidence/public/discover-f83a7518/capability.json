@@ -3,7 +3,7 @@
   "id": "local.mock_core.lookup_savings_balance",
   "version": "1.0.0",
   "title": "Look up member savings balance",
-  "description": "Look up member <memberId> and return the current savings balance",
+  "description": "Look up a member and return the current savings balance",
   "status": "draft",
   "app": {
     "vendor": "local",
@@ -30,6 +30,14 @@
       "sensitivity": "none",
       "description": "Current savings balance as displayed",
       "example_placeholder": null
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "Member display name; returned to caller, not stored in logs as raw PII",
+      "example_placeholder": null
     }
   ],
   "outcomes": [
@@ -52,11 +60,6 @@
       "kind": "business_outcome",
       "code": "validation_rejected",
       "description": "Lookup form validation failed"
-    },
-    {
-      "kind": "hard_failure",
-      "code": "session_expired",
-      "description": "Session is no longer valid"
     },
     {
       "kind": "hard_failure",
@@ -215,36 +218,6 @@
       "handlers": [
         {
           "when": {
-            "kind": "dialog",
-            "text": "Supervisor approval required",
-            "dialog_role": null,
-            "target": null
-          },
-          "then": {
-            "action": "escalate",
-            "code": null,
-            "kind": null,
-            "recover": null,
-            "reason": "Supervisor approval required"
-          }
-        },
-        {
-          "when": {
-            "kind": "dialog",
-            "text": "Please acknowledge this notice",
-            "dialog_role": null,
-            "target": null
-          },
-          "then": {
-            "action": "recover",
-            "code": null,
-            "kind": null,
-            "recover": "dismiss",
-            "reason": null
-          }
-        },
-        {
-          "when": {
             "kind": "text_matches",
             "text": "No member found",
             "dialog_role": null,
@@ -336,7 +309,46 @@
         ]
       },
       "value_from": null,
-      "extract_to": "savingsBalance",
+      "extract_to": "current_savings_balance",
+      "url": null,
+      "key": null,
+      "risk": "reversible",
+      "on_irreversible": "require_hitl",
+      "checkpoint": null,
+      "handlers": [],
+      "timeout_ms": 8000
+    },
+    {
+      "id": "s6_extract",
+      "action": "extract",
+      "target": {
+        "intent": "Return the current savings balance",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "labeled_readonly",
+            "role": null,
+            "name": null,
+            "label": "Savings",
+            "text": null,
+            "css": null,
+            "row_key": null,
+            "target_cell": null
+          },
+          {
+            "kind": "structural",
+            "role": null,
+            "name": null,
+            "label": null,
+            "text": null,
+            "css": null,
+            "row_key": "Savings",
+            "target_cell": 1
+          }
+        ]
+      },
+      "value_from": null,
+      "extract_to": "current_savings_balance",
       "url": null,
       "key": null,
       "risk": "reversible",
@@ -355,7 +367,6 @@
   "provenance": {
     "discovery_run_id": "discover-f83a7518",
     "model_id": "gpt-4o-mini",
-    "created_at": "2026-09-18T22:28:38.709366+00:00",
-    "notes": "error_handlers: compiler_specialization"
+    "created_at": "2026-09-18T20:44:22.694705+00:00"
   }
 }

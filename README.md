@@ -1,8 +1,6 @@
 # computer-use-automation
 
-Discover a back-office UI flow with an LLM once, compile a **versioned capability**, then **replay it with no model** — with policy, same-session human handoff, and declared business outcomes.
-
-This is a take-home vertical slice: one local mock core (no APIs, no test IDs), not a bank integration.
+Vertical slice of a **discover once, compile, replay without a model** architecture: policy, same-session human handoff, and distinct caller outcomes. The compiler is specialized to this **lookup-savings-balance** capability family on a local mock core (no APIs, no test IDs) — not arbitrary-app compilation.
 
 ## Architecture (control flow)
 
@@ -25,39 +23,72 @@ If the Chromium download fails (corporate TLS), replay still works with installe
 copy .env.example .env
 ```
 
-Put an `OPENAI_API_KEY` in `.env` for discovery. Replay does not need a key.
+Put an `OPENAI_API_KEY` in `.env` for **discovery only**. Replay does not need a key.
 
-## Demo path
+## Reviewer evidence (curated)
 
-Terminal 1 — mock core:
+Published proof lives under `evidence/public/` (see `evidence/README.md`). Six runs:
 
-```powershell
-python -m cua mock-server
-```
+| Run | What it shows |
+| --- | --- |
+| `discover-f83a7518` | Genuine LLM discovery (`gpt-4o-mini`); sanitized capability snapshot — not the canonical file |
+| `replay-1c9f10a2` | Clean deterministic success (`savingsBalance` only) |
+| `replay-c4d0861b` | `business_outcome` / `member_not_found` |
+| `replay-2503214d` | Recoverable Search notice → dismiss → success |
+| `replay-95e754bb` | `hard_failure` / `session_expired` |
+| `replay-df9e8123` | Same-session HITL → success (structured logs; screenshots omitted) |
 
-Terminal 2 — deterministic replay (no LLM):
+Replay has no LLM decision loop. Error/recovery handlers on Search are reviewed compiler specializations, not LLM-discovered.
 
-```powershell
-python -m cua invoke --start-mock --input memberId=12345
-python -m cua invoke --start-mock --input memberId=99999
-```
+## Demo path (one process)
 
-Happy path returns `success` with `savingsBalance` / `memberName`. Unknown member returns `business_outcome` / `member_not_found` (not a crash).
+Do **not** start `python -m cua mock-server` in a second terminal. `--start-mock` starts the mock in-process; running both fights over port 8765.
 
-LLM discovery (writes `capabilities/` + `evidence/`):
+Happy path returns `success` with required output **`savingsBalance` only**. Unknown member is `business_outcome` / `member_not_found`, not a crash.
 
-```powershell
-python -m cua discover --goal "Look up member 12345 and read the current savings balance" --target http://127.0.0.1:8765/
-```
-
-Headed HITL (automation pauses on irreversible actions; type `resume` or `abort`):
+Watch the UI (optional except HITL):
 
 ```powershell
 $env:CUA_HEADLESS="0"
-python -m cua invoke --input memberId=12345
 ```
 
-`CUA_HITL_AUTO_RESUME=1` skips the interactive pause (used in tests).
+Success / bounded recovery (`memberId=12345` — one-shot Search notice, then extract):
+
+```powershell
+python -m cua invoke --start-mock --input memberId=12345
+```
+
+Business outcome (`memberId=99999`):
+
+```powershell
+python -m cua invoke --start-mock --input memberId=99999
+```
+
+Hard failure (`memberId=00000`, session expired):
+
+```powershell
+python -m cua invoke --start-mock --input memberId=00000
+```
+
+Manual HITL (`memberId=11111`; same live browser/page). Unset auto-resume, click **OK** on the supervisor dialog, then type `resume`:
+
+```powershell
+Remove-Item Env:CUA_HITL_AUTO_RESUME -ErrorAction SilentlyContinue
+$env:CUA_HEADLESS="0"
+python -m cua invoke --start-mock --input memberId=11111
+```
+
+`CUA_HITL_AUTO_RESUME=1` skips the interactive pause (used in tests). Individual human browser clicks are not recorded.
+
+## Discovery (LLM)
+
+Requires `OPENAI_API_KEY`. `--start-mock` is supported (same in-process mock; do not also run `mock-server`):
+
+```powershell
+python -m cua discover --start-mock --goal "Look up member 12345 and read the current savings balance" --target http://127.0.0.1:8765/
+```
+
+Writes `capabilities/` plus a local `evidence/discover-*` run. Reviewers should use `evidence/public/discover-f83a7518/`, not a fresh overwrite of the public snapshot.
 
 ## Tests
 
@@ -69,8 +100,8 @@ pytest -q
 
 - `src/cua/` — orchestrator, policy, session, adapter, discovery, compiler, replay, HITL, evidence
 - `policy/allowlist.yaml` — origins and irreversible name patterns
-- `capabilities/` — versioned capability JSON
-- `evidence/` — per-run logs and failure screenshots
+- `capabilities/local.mock_core.lookup_savings_balance.v1.0.0.json` — canonical reviewed capability
+- `evidence/public/` — curated reviewer package; `evidence/README.md` explains it
 - `REPORT.md` — design write-up
 
-Secrets stay in `.env`. Artifacts store placeholders, not live member identifiers.
+Secrets stay in `.env`. Artifacts store placeholders, not live member identifiers. Mock balances and names are synthetic.

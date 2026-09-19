@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from cua.models import Capability, ProposedAction, RiskClass
+from cua.models import Capability, ProposedAction, RiskClass, Step, Target, LocatorStrategy
 from cua.policy import PolicyGate
 from cua.redact import redact_value
 from cua.models import Sensitivity
@@ -28,6 +28,21 @@ def test_seed_capability_validates():
     cap = Capability.model_validate_json(path.read_text(encoding="utf-8"))
     assert cap.id.endswith("lookup_savings_balance")
     assert any(o.code == "member_not_found" for o in cap.outcomes)
+
+
+def test_on_irreversible_block_is_denied():
+    step = Step(
+        id="s_xfer",
+        action="click",
+        risk=RiskClass.irreversible,
+        on_irreversible="block",
+        target=Target(
+            intent="Transfer",
+            strategies=[LocatorStrategy(kind="a11y", role="button", name="Transfer")],
+        ),
+    )
+    decision = POLICY.check_step(step, "http://127.0.0.1:8765/")
+    assert decision.allowed is False
 
 
 def test_redact_identifier():

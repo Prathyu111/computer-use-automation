@@ -1,0 +1,16 @@
+{
+  "kind": "success",
+  "code": "success",
+  "capability_id": "local.mock_core.lookup_savings_balance",
+  "capability_version": "1.0.0",
+  "run_id": "replay-df9e8123",
+  "outputs": {
+    "savingsBalance": "250.00"
+  },
+  "failed_step_id": null,
+  "expected": null,
+  "observed": null,
+  "evidence_ref": "evidence/replay-df9e8123",
+  "control": "agent",
+  "message": "ok"
+}

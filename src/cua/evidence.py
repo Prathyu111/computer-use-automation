@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cua.redact import redact_text
+from cua.redact import redact_for_log
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -43,8 +43,5 @@ class EvidenceSink:
     def _redact_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for key, value in payload.items():
-            if isinstance(value, str):
-                out[key] = redact_text(value)
-            else:
-                out[key] = value
+            out[key] = redact_for_log(key, value)
         return out

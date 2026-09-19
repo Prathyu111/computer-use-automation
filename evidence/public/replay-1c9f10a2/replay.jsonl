@@ -1,0 +1,13 @@
+{"ts": "2026-09-18T21:29:18.962391+00:00", "run_id": "replay-1c9f10a2", "event": "start", "capability": "local.mock_core.lookup_savings_balance", "params": {"memberId": "1\u20265"}}
+{"ts": "2026-09-18T21:29:21.171037+00:00", "run_id": "replay-1c9f10a2", "event": "policy", "step": "s1_goto_entry", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:29:21.171807+00:00", "run_id": "replay-1c9f10a2", "event": "step_start", "step": "s1_goto_entry", "action": "goto"}
+{"ts": "2026-09-18T21:29:21.426184+00:00", "run_id": "replay-1c9f10a2", "event": "policy", "step": "s2_dismiss", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:29:21.428418+00:00", "run_id": "replay-1c9f10a2", "event": "step_start", "step": "s2_dismiss", "action": "dismiss"}
+{"ts": "2026-09-18T21:29:21.516006+00:00", "run_id": "replay-1c9f10a2", "event": "dismiss", "step": "s2_dismiss", "status": "dismissed"}
+{"ts": "2026-09-18T21:29:21.517940+00:00", "run_id": "replay-1c9f10a2", "event": "policy", "step": "s3_type", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:29:21.519293+00:00", "run_id": "replay-1c9f10a2", "event": "step_start", "step": "s3_type", "action": "clear_and_type"}
+{"ts": "2026-09-18T21:29:21.599833+00:00", "run_id": "replay-1c9f10a2", "event": "policy", "step": "s4_click", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:29:21.601530+00:00", "run_id": "replay-1c9f10a2", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-18T21:29:22.051283+00:00", "run_id": "replay-1c9f10a2", "event": "policy", "step": "s5_extract", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-18T21:29:22.052531+00:00", "run_id": "replay-1c9f10a2", "event": "step_start", "step": "s5_extract", "action": "extract"}
+{"ts": "2026-09-18T21:29:22.171447+00:00", "run_id": "replay-1c9f10a2", "event": "output", "name": "savingsBalance", "value": "[\u20262"}

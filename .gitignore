@@ -9,5 +9,7 @@ dist/
 build/
 playwright-report/
 test-results/
+.vscode/
+evidence/examples/
 evidence/replay-*
 evidence/discover-*

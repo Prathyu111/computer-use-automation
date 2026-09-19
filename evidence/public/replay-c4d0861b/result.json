@@ -3,12 +3,12 @@
   "code": "member_not_found",
   "capability_id": "local.mock_core.lookup_savings_balance",
   "capability_version": "1.0.0",
-  "run_id": "replay-bb84c579",
+  "run_id": "replay-c4d0861b",
   "outputs": {},
-  "failed_step_id": "s4_search",
+  "failed_step_id": "s4_click",
   "expected": null,
   "observed": null,
-  "evidence_ref": "C:\\Users\\prath\\computer-use-automation\\evidence\\replay-bb84c579",
+  "evidence_ref": "evidence/replay-c4d0861b",
   "control": "agent",
   "message": "member_not_found"
 }
