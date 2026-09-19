@@ -1,0 +1,19 @@
+{"ts": "2026-09-19T03:14:01.306457+00:00", "run_id": "replay-a46f4e20", "event": "start", "capability": "local.mock_core.lookup_savings_balance", "params": {"memberId": "1\u20261"}}
+{"ts": "2026-09-19T03:14:03.561838+00:00", "run_id": "replay-a46f4e20", "event": "policy", "step": "s1_goto_entry", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-19T03:14:03.563958+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s1_goto_entry", "action": "goto"}
+{"ts": "2026-09-19T03:14:03.716396+00:00", "run_id": "replay-a46f4e20", "event": "policy", "step": "s2_dismiss", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-19T03:14:03.717507+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s2_dismiss", "action": "dismiss"}
+{"ts": "2026-09-19T03:14:03.798133+00:00", "run_id": "replay-a46f4e20", "event": "dismiss", "step": "s2_dismiss", "status": "dismissed"}
+{"ts": "2026-09-19T03:14:03.799327+00:00", "run_id": "replay-a46f4e20", "event": "policy", "step": "s3_type", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-19T03:14:03.800301+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s3_type", "action": "clear_and_type"}
+{"ts": "2026-09-19T03:14:03.863413+00:00", "run_id": "replay-a46f4e20", "event": "policy", "step": "s4_click", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-19T03:14:03.864614+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-19T03:14:04.021415+00:00", "run_id": "replay-a46f4e20", "event": "handler", "step": "s4_click", "then": "escalate", "code": null}
+{"ts": "2026-09-19T03:14:04.028033+00:00", "run_id": "replay-a46f4e20", "event": "hitl_request", "reason": "Supervisor approval required", "step_id": "s4_click", "mode": "takeover", "url_before": "http://127.0.0.1:[REDACTED]/", "heading_before": "Member lookup", "lock": "human"}
+{"ts": "2026-09-19T03:15:06.206316+00:00", "run_id": "replay-a46f4e20", "event": "human_action", "actor": "human", "source": "cli", "choice": "resume", "operator_note": "Clicked OK on the supervisor approval dialog.", "mode": "takeover", "lock": "human", "human_completed": false, "url_before": "http://127.0.0.1:[REDACTED]/", "heading_before": "Member lookup", "url_after": "http://127.0.0.1:[REDACTED]/", "heading_after": "Member lookup", "page_changed": false, "reported_ui_action": "acknowledged_supervisor_dialog"}
+{"ts": "2026-09-19T03:15:06.207358+00:00", "run_id": "replay-a46f4e20", "event": "hitl_resume", "mode": "takeover"}
+{"ts": "2026-09-19T03:15:06.210847+00:00", "run_id": "replay-a46f4e20", "event": "hitl_after", "human_completed": false, "url_after": "http://127.0.0.1:[REDACTED]/", "heading_after": "Member lookup", "lock": "agent"}
+{"ts": "2026-09-19T03:15:06.306413+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s4_click", "action": "click"}
+{"ts": "2026-09-19T03:15:06.890970+00:00", "run_id": "replay-a46f4e20", "event": "policy", "step": "s5_extract", "allowed": true, "reason": "allowlisted"}
+{"ts": "2026-09-19T03:15:06.891686+00:00", "run_id": "replay-a46f4e20", "event": "step_start", "step": "s5_extract", "action": "extract"}
+{"ts": "2026-09-19T03:15:07.012462+00:00", "run_id": "replay-a46f4e20", "event": "output", "name": "savingsBalance", "value": "2\u20260"}

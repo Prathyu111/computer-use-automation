@@ -8,7 +8,9 @@ Every mutation is: **proposed or recorded action → policy gate → session con
 
 This slice demonstrates that architecture for one **lookup-savings-balance** family on a local mock core. The compiler is specialized to that family (parameterized member id, ranked locators from the working role+name, declared Search handlers). It is not a general “compile any app” product.
 
-HITL entry points: discovery `stuck` and `act_failed`; replay **handler escalate**; policy **irreversible** (`require_hitl`) in either mode if classified. Unresolved locator on replay is `hard_failure`, not HITL. Exhausting discovery `--max-steps` raises `CompileError`, not HITL. The operator takes and returns **the same live browser session**. Evidence is a dotted sink (JSONL; screenshot on non-success plus HITL before/after locally), not on the act path.
+The published path is genuine LLM discovery → exploratory successful trace → compiler normalization → reviewed compiler specialization → canonical capability → deterministic no-LLM replay. Compiler-owned error handlers are reviewed specialization, not claimed as LLM-discovered.
+
+HITL entry points: discovery `stuck` and `act_failed`; replay **handler escalate**; policy **irreversible** (`require_hitl`) in either mode if classified. Unresolved locator on replay is `hard_failure`, not HITL. Exhausting discovery `--max-steps` raises `CompileError`, not HITL. The operator takes and returns **the same live browser session**. CLI verbs remain `resume` / `done` / `abort`; an operator-reported UI action (not an inferred click) may be logged as `human_action` while `lock=human`. Evidence is a dotted sink (JSONL; screenshot on non-success plus HITL before/after locally), not on the act path.
 
 Policy **deny** (off-allowlist) is a hard failure without calling the adapter. Recoverable UI (dismiss interstitial) is handled inside replay and is not a caller status (`replay-2503214d`).
 
@@ -34,7 +36,7 @@ Search runtime handlers (member/permission/validation banners, Session expired h
 - `evidence/public/discover-f83a7518/capability.json` is a **sanitized snapshot** of the capability written from successful discovery run `discover-f83a7518` (description redacted). Do **not** overwrite it with the current canonical JSON. Its provenance is the discovery compile (`model_id=gpt-4o-mini`); it is not re-stamped with later specialization notes.
 - `capabilities/local.mock_core.lookup_savings_balance.v1.0.0.json` is the **reviewed/normalized** artifact after compiler normalization and deterministic error-handler specialization. Replay demos use this file. Required output is `savingsBalance` only (the public snapshot still lists a discovery-era `memberName` field).
 
-## 3. Determinism and error handling
+## 3. Determinism & error handling
 
 Replay tries **ranked locator strategies** in order. A strategy is accepted only when the Playwright locator `count == 1`, then `wait_for(state="visible")` (and editable/clickable when required). That is not a complete accessibility-tree walk, and it is not “exactly one visible among many.” A unique-match miss is `hard_failure` (screenshot on non-success). Checkpoints assert headings/text. Clicks wait for `domcontentloaded`.
 
@@ -44,29 +46,31 @@ Runtime errors are classified by **declared handlers**, not by the model:
 - Permission copy → `permission_denied`
 - Empty id → `validation_rejected`
 - Search one-shot notice (`memberId=12345`) → recover/dismiss via `_recover`, then continue — `evidence/public/replay-2503214d`
-- Search HITL dialog (`memberId=11111`, **Supervisor approval required**) → `escalate` → same-session HITL → human dismisses → `resume` retries Search → success — `evidence/public/replay-df9e8123`. Distinct from the auto-recover notice; not classified as recover.
+- Search HITL dialog (`memberId=11111`, **Supervisor approval required**) → `escalate` → same-session HITL → human dismisses → `resume` retries Search → success — current proof `evidence/public/replay-a46f4e20` (operator-reported `human_action`); historical `evidence/public/replay-df9e8123` (no `human_action`). Distinct from the auto-recover notice; not classified as recover.
 - Banner “Session expired” (`memberId=00000`) → `hard_failure` / `session_expired` — `evidence/public/replay-95e754bb` (not a business outcome; no extract)
 - Known GET `/` overlay → dismiss step `s2_dismiss` (not the Search recover path)
 - Policy deny or unresolved locator → `hard_failure` with `stepId`, expected, observed, screenshot
 - Unknown / irreversible without operator → escalate (policy HITL)
 
+Known declared conditions may recover or escalate per artifact handlers. Unresolved or unrecognized states with no matching rule fail closed (`hard_failure`) rather than improvising.
+
 Clean success without that Search recover path: `evidence/public/replay-1c9f10a2`. Genuine discovery: `evidence/public/discover-f83a7518`.
 
-## 4. Heterogeneity and multi-tenant
+## 4. Heterogeneity & multi-tenant
 
 The capability speaks **semantic actions + locator intents**. Playwright lives only in the web adapter. A desktop adapter could implement the same `observe` / `act` / `resolve` surface using the OS accessibility tree without changing step language.
 
 Multi-tenant: the base artifact is the vendor product. A tenant overlay (unused in code) may replace locators, interstitial copy, and resolved host **by step id**. It must not change inputs, outputs, or outcome codes — that is a new `version`. Drift is a checkpoint failure after overlay locators; fix the overlay or the broken step, do not re-record per institution.
 
-## 5. Escalation and handoff
+## 5. Escalation & handoff
 
-Replay HITL in this slice is the Search handler `then.action: escalate` (and policy irreversible if a step is classified that way). Discovery may HITL on LLM `stuck` or `act_failed`. The session lock becomes `human`; the adapter will not act. A headed window is the **same live session**. CLI: `resume` / `done` / `abort`. `resume` returns the lock to `agent` and replay retries the blocked step; `done` skips re-execution (`extract` still requires a value); `abort` leaves `paused` and the run is `escalated`.
+Replay HITL in this slice is the Search handler `then.action: escalate` (and policy irreversible if a step is classified that way). Discovery may HITL on LLM `stuck` or `act_failed`. The session lock becomes `human`; the adapter will not act. A headed window is the **same live session**. CLI: `resume` / `done` / `abort`. Interactive `resume`/`done` also require a structured operator-reported UI action (optional note); that is logged as `human_action` with `lock=human` before control returns. Clicks are not captured. `resume` then returns the lock to `agent` and replay retries the blocked step; `done` skips re-execution (`extract` still requires a value); `abort` may omit the reported action, leaves `paused`, and the run is `escalated`. Env auto-resume/complete (`CUA_HITL_AUTO_*`) does not claim `actor=human`.
 
 **Synthetic HITL demo (not a Transfer / goal change):** `memberId=11111`. First Search shows a blocking alertdialog. After the human clicks OK, `resume` retries Search; 11111 is in `MEMBERS`, so lookup succeeds. `memberId=12345` still only gets the auto-recover notice.
 
-**Published HITL proof** is the structured sequence in `evidence/public/replay-df9e8123`: handler `escalate` → `hitl_request` (`lock=human`) → `hitl_resume` → `hitl_after` (`lock=agent`) → retry Search → extract → `success`. Also `intervention_request.json`. **Limitation:** individual human browser clicks are not recorded (no event spy). Raw `hitl_before.png` / `hitl_after.png` are retained locally and **omitted from the curated package** because screenshots are not automatically pixel-redacted. Do not cite gitignored local evidence as the public proof.
+**Published HITL proof** is the structured sequence in `evidence/public/replay-a46f4e20`: handler `escalate` → `hitl_request` (`lock=human`) → `human_action` (`actor=human`, `reported_ui_action=acknowledged_supervisor_dialog`, `choice=resume`) → `hitl_resume` → `hitl_after` (`lock=agent`) → retry Search → extract → `success`. Also `intervention_request.json`. Historical snapshot `evidence/public/replay-df9e8123` predates `human_action` and is not rewritten. **Limitation:** individual human browser clicks are not recorded (no event spy); the operator-reported `human_action` is logged while `lock=human`. Raw `hitl_before.png` / `hitl_after.png` are retained locally and **omitted from the curated package** because screenshots are not automatically pixel-redacted. Do not cite gitignored local evidence as the public proof.
 
-Do **not** set `CUA_HITL_AUTO_RESUME` for a headed product demo. Tests may auto-resume **after** a test-only helper clicks OK on the same Playwright page.
+Do **not** set `CUA_HITL_AUTO_RESUME` for a headed product demo. Tests may auto-resume **after** a test-only helper clicks OK on the same Playwright page; that auto path does not log `actor=human`.
 
 ## 6. Safety
 

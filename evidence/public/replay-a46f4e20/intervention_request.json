@@ -1,0 +1,8 @@
+{
+  "reason": "Supervisor approval required",
+  "step_id": "s4_click",
+  "mode": "takeover",
+  "url_before": "http://127.0.0.1:8765/",
+  "heading_before": "Member lookup",
+  "lock": "human"
+}

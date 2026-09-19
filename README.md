@@ -1,6 +1,6 @@
 # computer-use-automation
 
-Vertical slice of a **discover once, compile, replay without a model** architecture: policy, same-session human handoff, and distinct caller outcomes. The compiler is specialized to this **lookup-savings-balance** capability family on a local mock core (no APIs, no test IDs) — not arbitrary-app compilation.
+Vertical slice of a **discover once, compile, replay without a model** architecture: policy, same-session human handoff, and distinct caller outcomes. The compiler is specialized to this **lookup-savings-balance** capability family on a local mock core (no APIs; documented scenario/member IDs are synthetic mock identifiers, while real PII, credentials, secrets, and machine-local sensitive information are excluded or redacted) — not arbitrary-app compilation.
 
 ## Architecture (control flow)
 
@@ -27,7 +27,7 @@ Put an `OPENAI_API_KEY` in `.env` for **discovery only**. Replay does not need a
 
 ## Reviewer evidence (curated)
 
-Published proof lives under `evidence/public/` (see `evidence/README.md`). Six runs:
+Published proof lives under `evidence/public/` (see `evidence/README.md`). Seven runs:
 
 | Run | What it shows |
 | --- | --- |
@@ -36,9 +36,10 @@ Published proof lives under `evidence/public/` (see `evidence/README.md`). Six r
 | `replay-c4d0861b` | `business_outcome` / `member_not_found` |
 | `replay-2503214d` | Recoverable Search notice → dismiss → success |
 | `replay-95e754bb` | `hard_failure` / `session_expired` |
-| `replay-df9e8123` | Same-session HITL → success (structured logs; screenshots omitted) |
+| `replay-a46f4e20` | Current same-session HITL → success with operator-reported `human_action` (screenshots omitted) |
+| `replay-df9e8123` | Historical same-session HITL → success (no `human_action`; screenshots omitted) |
 
-Replay has no LLM decision loop. Error/recovery handlers on Search are reviewed compiler specializations, not LLM-discovered.
+Replay has no LLM decision loop. Error/recovery handlers on Search are reviewed compiler specializations, not LLM-discovered. REPORT.md records the path: genuine discovery → exploratory trace → compiler normalization → reviewed specialization → canonical capability → deterministic replay.
 
 ## Demo path (one process)
 
@@ -70,7 +71,7 @@ Hard failure (`memberId=00000`, session expired):
 python -m cua invoke --start-mock --input memberId=00000
 ```
 
-Manual HITL (`memberId=11111`; same live browser/page). Unset auto-resume, click **OK** on the supervisor dialog, then type `resume`:
+Manual HITL (`memberId=11111`; same live browser/page). Unset auto-resume, click **OK** on the supervisor dialog, then type `resume` (or `done` / `abort`). For interactive `resume`/`done`, report what you did in the live UI (number or label); clicks are not captured from the DOM.
 
 ```powershell
 Remove-Item Env:CUA_HITL_AUTO_RESUME -ErrorAction SilentlyContinue
@@ -78,7 +79,7 @@ $env:CUA_HEADLESS="0"
 python -m cua invoke --start-mock --input memberId=11111
 ```
 
-`CUA_HITL_AUTO_RESUME=1` skips the interactive pause (used in tests). Individual human browser clicks are not recorded.
+`CUA_HITL_AUTO_RESUME=1` / `CUA_HITL_AUTO_COMPLETE=1` skip the interactive pause (used in tests) and do not claim a human actor. An operator-reported UI action is logged as `human_action` while `lock=human`; CLI verbs remain `resume` / `done` / `abort`. Individual browser clicks are not recorded.
 
 ## Discovery (LLM)
 

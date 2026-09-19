@@ -130,4 +130,38 @@ def test_replay_hitl_member_escalates_resume_then_success(mock_server, lookup_ca
     assert any(e.get("event") == "handler" and e.get("then") == "escalate" for e in events)
     assert any(e.get("event") == "hitl_request" for e in events)
     assert any(e.get("event") == "hitl_after" and e.get("lock") == "agent" for e in events)
+    assert any(e.get("event") == "hitl_auto" for e in events)
+    assert not any(e.get("event") == "human_action" for e in events)
     assert not any(e.get("event") == "handler" and e.get("then") == "recover" for e in events)
+
+
+def test_replay_hitl_cli_logs_human_action_then_success(mock_server, lookup_cap_path, monkeypatch):
+    os.environ.pop("CUA_HITL_AUTO_COMPLETE", None)
+    os.environ.pop("CUA_HITL_AUTO_RESUME", None)
+    answers = iter(
+        [
+            "resume",
+            "acknowledged_supervisor_dialog",
+            "Clicked OK on the supervisor approval dialog.",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: next(answers))
+    monkeypatch.setattr("cua.orchestrator.HumanIntervention", _DismissHitlThenResume)
+    try:
+        result = Orchestrator().invoke(lookup_cap_path, {"memberId": "11111"})
+    finally:
+        os.environ["CUA_HITL_AUTO_RESUME"] = "1"
+    assert result.kind is ResultKind.success
+    assert result.outputs["savingsBalance"] == "250.00"
+    events = _replay_events(result)
+    human_actions = [e for e in events if e.get("event") == "human_action"]
+    assert len(human_actions) == 1
+    ha = human_actions[0]
+    assert ha.get("actor") == "human"
+    assert ha.get("source") == "cli"
+    assert ha.get("choice") == "resume"
+    assert ha.get("reported_ui_action") == "acknowledged_supervisor_dialog"
+    assert ha.get("operator_note") == "Clicked OK on the supervisor approval dialog."
+    assert ha.get("lock") == "human"
+    assert any(e.get("event") == "hitl_resume" for e in events)
+    assert any(e.get("event") == "hitl_after" and e.get("lock") == "agent" for e in events)

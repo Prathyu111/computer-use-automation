@@ -12,6 +12,13 @@ from cua.session import Session
 
 HitlMode = Literal["approve", "takeover"]
 
+REPORTED_UI_ACTIONS = (
+    "acknowledged_supervisor_dialog",
+    "dismissed_dialog",
+    "completed_pending_step",
+    "other",
+)
+
 
 @dataclass
 class HitlOutcome:
@@ -19,6 +26,20 @@ class HitlOutcome:
     human_completed: bool
     mode: HitlMode
     value: str | None = None
+
+
+def parse_reported_ui_action(raw: str) -> str | None:
+    text = raw.strip().lower().replace(" ", "_")
+    if not text:
+        return None
+    if text.isdigit():
+        idx = int(text)
+        if 1 <= idx <= len(REPORTED_UI_ACTIONS):
+            return REPORTED_UI_ACTIONS[idx - 1]
+        return None
+    if text in REPORTED_UI_ACTIONS:
+        return text
+    return None
 
 
 class HumanIntervention:
@@ -88,11 +109,26 @@ class HumanIntervention:
             answer = "abort"
         lowered = answer.lower()
         if lowered == "resume":
+            reported, note = self._prompt_reported_action()
+            self._log_human_action(
+                choice="resume",
+                mode=mode,
+                human_completed=False,
+                before=before,
+                reported_ui_action=reported,
+                operator_note=note,
+            )
             self.evidence.log("hitl_resume", mode=mode)
             self.session.return_to_agent()
             self._log_after(False)
             return HitlOutcome(self.session.lock, False, mode)
         if lowered == "abort":
+            self._log_human_action(
+                choice="abort",
+                mode=mode,
+                human_completed=False,
+                before=before,
+            )
             self.evidence.log("hitl_abort", mode=mode)
             self.session.pause()
             self._log_after(False)
@@ -101,18 +137,95 @@ class HumanIntervention:
         if verb.lower() in {"done", "complete"}:
             supplied = rest.strip() or None
             if require_value and not supplied:
+                self._log_human_action(
+                    choice="done_refused",
+                    mode=mode,
+                    human_completed=False,
+                    before=before,
+                )
                 self.evidence.log("hitl_done_refused", mode=mode, reason="extract requires a value")
                 self.session.return_to_agent()
                 self._log_after(False)
                 return HitlOutcome(self.session.lock, False, mode)
+            reported, note = self._prompt_reported_action()
+            self._log_human_action(
+                choice="done",
+                mode=mode,
+                human_completed=True,
+                before=before,
+                reported_ui_action=reported,
+                operator_note=note,
+            )
             self.evidence.log("hitl_done", mode=mode)
             self.session.return_to_agent()
             self._log_after(True)
             return HitlOutcome(self.session.lock, True, mode, value=supplied)
+        self._log_human_action(
+            choice="abort",
+            mode=mode,
+            human_completed=False,
+            before=before,
+        )
         self.evidence.log("hitl_abort", mode=mode)
         self.session.pause()
         self._log_after(False)
         return HitlOutcome(self.session.lock, False, mode)
+
+    def _prompt_reported_action(self) -> tuple[str, str | None]:
+        while True:
+            print("What did you do in the live UI?")
+            print("  1 acknowledged_supervisor_dialog")
+            print("  2 dismissed_dialog")
+            print("  3 completed_pending_step")
+            print("  4 other")
+            try:
+                raw = input().strip()
+            except (EOFError, OSError):
+                raw = ""
+            parsed = parse_reported_ui_action(raw)
+            if parsed:
+                break
+            print(
+                "Enter 1-4 or a label: "
+                "acknowledged_supervisor_dialog | dismissed_dialog | completed_pending_step | other"
+            )
+        try:
+            note = input("Optional one-line note (Enter to skip): ").strip() or None
+        except (EOFError, OSError):
+            note = None
+        if note:
+            note = note[:200]
+        return parsed, note
+
+    def _log_human_action(
+        self,
+        *,
+        choice: str,
+        mode: HitlMode,
+        human_completed: bool,
+        before: dict[str, str | None],
+        reported_ui_action: str | None = None,
+        operator_note: str | None = None,
+    ) -> None:
+        after = self._snapshot_state()
+        payload: dict[str, Any] = {
+            "actor": "human",
+            "source": "cli",
+            "choice": choice,
+            "operator_note": operator_note,
+            "mode": mode,
+            "lock": self.session.lock.value,
+            "human_completed": human_completed,
+            "url_before": before.get("url"),
+            "heading_before": before.get("heading"),
+            "url_after": after.get("url"),
+            "heading_after": after.get("heading"),
+            "page_changed": before.get("url") != after.get("url")
+            or before.get("heading") != after.get("heading"),
+        }
+        if reported_ui_action is not None:
+            payload["reported_ui_action"] = reported_ui_action
+        self.evidence.log("human_action", **payload)
 
     def _snapshot_state(self) -> dict[str, str | None]:
         page = self.session.page

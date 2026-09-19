@@ -6,7 +6,7 @@ Raw discovery and replay runs are retained locally under `evidence/discover-*` a
 
 All member identifiers, names, balances, and account information used by the local mock are **synthetic test data** and do not represent real customers.
 
-## Six published runs
+## Seven published runs
 
 | Directory | Demonstrates |
 | --- | --- |
@@ -15,7 +15,8 @@ All member identifiers, names, balances, and account information used by the loc
 | `public/replay-c4d0861b/` | `member_not_found` business outcome |
 | `public/replay-2503214d/` | Recoverable Search condition → success |
 | `public/replay-95e754bb/` | `session_expired` hard failure |
-| `public/replay-df9e8123/` | Same-session HITL → success (structured logs; screenshots omitted) |
+| `public/replay-a46f4e20/` | Current same-session HITL → success with operator-reported `human_action` (structured logs; screenshots omitted) |
+| `public/replay-df9e8123/` | Historical same-session HITL → success (no `human_action`; structured logs; screenshots omitted) |
 
 Replay logs contain no LLM decision loop. `result.json` `evidence_ref` values still name the original local `evidence/replay-*` paths; the published copies live under `evidence/public/`.
 
@@ -25,8 +26,8 @@ Screenshots are not automatically pixel-redacted. Public inclusion is conservati
 
 - Included: `public/replay-95e754bb/hard_failure.png` (session expired; Member ID field empty).
 - Omitted: `business_outcome.png` from replay-c4d0861b (identifier visible). Replay still screenshots non-success locally.
-- Omitted: `hitl_before.png` and `hitl_after.png` from replay-df9e8123 (identifier visible). Those files remain in the raw local run.
-- HITL public proof is the JSONL sequence (escalate → `hitl_request` lock=human → `hitl_resume` → `hitl_after` lock=agent → retry → extract → success) plus `intervention_request.json`. Individual browser clicks during takeover are not recorded.
+- Omitted: `hitl_before.png` and `hitl_after.png` from replay-a46f4e20 and replay-df9e8123 (identifier visible). Those files remain in the raw local runs.
+- Current HITL public proof is `replay-a46f4e20`: JSONL sequence (escalate → `hitl_request` lock=human → `human_action` actor=human → `hitl_resume` → `hitl_after` lock=agent → retry → extract → success) plus `intervention_request.json`. `replay-df9e8123` is the historical snapshot without `human_action`. Individual browser clicks during takeover are not recorded.
 
 ## Public discovery snapshot vs canonical capability
 
@@ -48,6 +49,9 @@ evidence/public/replay-2503214d/replay.jsonl
 evidence/public/replay-95e754bb/result.json
 evidence/public/replay-95e754bb/replay.jsonl
 evidence/public/replay-95e754bb/hard_failure.png
+evidence/public/replay-a46f4e20/result.json
+evidence/public/replay-a46f4e20/replay.jsonl
+evidence/public/replay-a46f4e20/intervention_request.json
 evidence/public/replay-df9e8123/result.json
 evidence/public/replay-df9e8123/replay.jsonl
 evidence/public/replay-df9e8123/intervention_request.json
