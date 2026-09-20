@@ -73,7 +73,11 @@ class HumanIntervention:
 
         auto_complete = os.environ.get("CUA_HITL_AUTO_COMPLETE", "0") == "1"
         auto_resume = os.environ.get("CUA_HITL_AUTO_RESUME", "0") == "1"
-        if auto_complete or auto_resume:
+        # AUTO_RESUME is test-only for takeover/stuck HITL; it cannot satisfy
+        # mode="approve". AUTO_COMPLETE is also test-only: it skips re-execution
+        # (simulated human completion) and does not authorize the agent to execute
+        # the policy-gated action. It is not verified real human activity.
+        if auto_complete or (auto_resume and mode != "approve"):
             completed = auto_complete
             supplied = (os.environ.get("CUA_HITL_VALUE") or "").strip() or None
             if require_value and completed and not supplied:

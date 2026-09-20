@@ -107,16 +107,47 @@ def test_hitl_done_refused_omits_reported_ui_action(monkeypatch):
     assert any(e["event"] == "hitl_done_refused" for e in evidence.events)
 
 
-def test_hitl_auto_resume_does_not_log_actor_human():
+def test_hitl_auto_resume_does_not_log_actor_human(monkeypatch):
     os.environ["CUA_HITL_AUTO_RESUME"] = "1"
     os.environ.pop("CUA_HITL_AUTO_COMPLETE", None)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("takeover auto-resume must not prompt")),
+    )
     session = Session(headless=True)
     evidence = EvidenceSink("replay-hitl-unit-auto", "hitl")
     try:
-        HumanIntervention(session, evidence).request("unit")
+        outcome = HumanIntervention(session, evidence).request("unit", mode="takeover")
     finally:
         os.environ.pop("CUA_HITL_AUTO_RESUME", None)
         os.environ["CUA_HITL_AUTO_RESUME"] = "1"
+    assert outcome.human_completed is False
+    assert session.lock.value == "agent"
     assert not any(e.get("event") == "human_action" for e in evidence.events)
     assert not any(e.get("actor") == "human" for e in evidence.events)
     assert any(e.get("event") == "hitl_auto" for e in evidence.events)
+
+
+def test_hitl_auto_resume_does_not_approve_policy_mode(monkeypatch):
+    os.environ["CUA_HITL_AUTO_RESUME"] = "1"
+    os.environ.pop("CUA_HITL_AUTO_COMPLETE", None)
+    prompts: list[str] = []
+
+    def fake_input(*_args, **_kwargs):
+        prompts.append("prompted")
+        return "abort"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    session = Session(headless=True)
+    evidence = EvidenceSink("replay-hitl-unit-approve-auto", "hitl")
+    try:
+        outcome = HumanIntervention(session, evidence).request("policy irreversible", mode="approve")
+    finally:
+        os.environ.pop("CUA_HITL_AUTO_RESUME", None)
+        os.environ["CUA_HITL_AUTO_RESUME"] = "1"
+    assert prompts, "policy approve HITL must still prompt despite AUTO_RESUME"
+    assert outcome.human_completed is False
+    assert session.lock.value == "paused"
+    assert not any(e.get("event") == "hitl_auto" for e in evidence.events)
+    assert any(e.get("event") == "hitl_abort" for e in evidence.events)
+    assert any(e.get("event") == "hitl_request" and e.get("mode") == "approve" for e in evidence.events)

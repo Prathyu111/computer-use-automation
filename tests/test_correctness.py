@@ -181,6 +181,51 @@ def test_policy_denial_on_invoke(mock_server, tmp_path):
     assert "allowlist" in (result.expected or result.message).lower() or "allowlist" in (result.observed or "").lower()
 
 
+def test_auto_resume_does_not_execute_policy_required_transfer(mock_server, tmp_path, monkeypatch):
+    os.environ.pop("CUA_HITL_AUTO_COMPLETE", None)
+    os.environ["CUA_HITL_AUTO_RESUME"] = "1"
+    monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: "abort")
+    clicked: list[str] = []
+    orig = SurfaceAdapter.act_step
+
+    def wrapped(self, action, target=None, **kwargs):
+        if action == "click" and target is not None:
+            clicked.append(target.intent or "")
+        return orig(self, action, target, **kwargs)
+
+    monkeypatch.setattr(SurfaceAdapter, "act_step", wrapped)
+    cap = compiled_lookup_capability()
+    cap.steps.append(
+        Step(
+            id="s_xfer",
+            action="click",
+            risk=RiskClass.irreversible,
+            on_irreversible="require_hitl",
+            target=Target(
+                intent="Transfer",
+                strategies=[LocatorStrategy(kind="a11y", role="button", name="Transfer")],
+            ),
+        )
+    )
+    cap.irreversible_step_ids = ["s_xfer"]
+    path = tmp_path / "xfer_auto_resume.json"
+    path.write_text(cap.model_dump_json(), encoding="utf-8")
+    result = Orchestrator().invoke(path, {"memberId": "12345"})
+    assert result.kind is ResultKind.escalated
+    assert "Transfer" not in clicked
+    events = [
+        json.loads(line)
+        for line in (Path(result.evidence_ref) / "replay.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert any(e.get("event") == "hitl_request" and e.get("mode") == "approve" for e in events)
+    assert any(e.get("event") == "hitl_abort" for e in events)
+    assert not any(e.get("event") == "hitl_auto" for e in events)
+    assert not any(
+        e.get("event") == "hitl_auto" and e.get("reason") == "CUA_HITL_AUTO_RESUME" for e in events
+    )
+
+
 def test_hitl_complete_skips_reexecution(mock_server, tmp_path):
     os.environ["CUA_HITL_AUTO_COMPLETE"] = "1"
     cap = compiled_lookup_capability()

@@ -79,7 +79,7 @@ $env:CUA_HEADLESS="0"
 python -m cua invoke --start-mock --input memberId=11111
 ```
 
-`CUA_HITL_AUTO_RESUME=1` / `CUA_HITL_AUTO_COMPLETE=1` skip the interactive pause (used in tests) and do not claim a human actor. An operator-reported UI action is logged as `human_action` while `lock=human`; CLI verbs remain `resume` / `done` / `abort`. Individual browser clicks are not recorded.
+`CUA_HITL_AUTO_RESUME=1` is a test-only skip for takeover/stuck HITL; it never satisfies policy-required approval (`mode=approve` for risky/irreversible actions). `CUA_HITL_AUTO_COMPLETE=1` is also test-only: it skips re-execution (simulated human completion) and does not authorize the agent to execute the policy-gated action. It is not verified real human activity. Neither env claims a human actor. An operator-reported UI action is logged as `human_action` while `lock=human`; CLI verbs remain `resume` / `done` / `abort`. Individual browser clicks are not recorded.
 
 ## Discovery (LLM)
 
