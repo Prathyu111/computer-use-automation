@@ -19,11 +19,13 @@ from cua.models import (
     ControlLock,
     ProposedAction,
     RunResult,
+    TenantOverlay,
 )
 from cua.policy import PolicyGate
 from cua.redact import redact_value
 from cua.replay import ReplayEngine
 from cua.session import Session
+from cua.specialization import apply_overlay
 
 _ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(_ROOT / ".env")
@@ -113,16 +115,40 @@ class Orchestrator:
         finally:
             session.close()
 
-    def invoke(self, capability_path: Path, params: dict[str, str]) -> RunResult:
+    def invoke(
+        self,
+        capability_path: Path,
+        params: dict[str, str],
+        overlay_path: Path | None = None,
+    ) -> RunResult:
         run_id = f"replay-{uuid.uuid4().hex[:8]}"
         evidence = EvidenceSink(run_id, "replay")
-        cap = Capability.model_validate_json(capability_path.read_text(encoding="utf-8"))
-        evidence.log("start", capability=cap.id, params=params)
+        loaded = Capability.model_validate_json(capability_path.read_text(encoding="utf-8"))
+        cap = loaded
+        overlay_id: str | None = None
+        if overlay_path is not None:
+            overlay = TenantOverlay.model_validate_json(
+                Path(overlay_path).read_text(encoding="utf-8")
+            )
+            cap = apply_overlay(loaded, overlay)
+            overlay_id = overlay.id
+        start_payload: dict = {"capability": cap.id, "params": params}
+        if overlay_id:
+            start_payload["overlay_id"] = overlay_id
+        evidence.log("start", **start_payload)
         headless = os.environ.get("CUA_HEADLESS", "1") != "0"
         session = Session(headless=headless)
         try:
             session.start(cap.entry)
-            adapter = SurfaceAdapter(session.page)
+            tenant = cap.tenant
+            frame_scope = None
+            if tenant is not None and tenant.surface is not None:
+                frame_scope = tenant.surface.frame_scope
+            adapter = SurfaceAdapter(
+                session.page,
+                frame_scope=frame_scope,
+                surface_contract=tenant is not None,
+            )
             hitl = HumanIntervention(session, evidence)
             engine = ReplayEngine(
                 capability=cap,

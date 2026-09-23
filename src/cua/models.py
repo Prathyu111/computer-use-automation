@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Sensitivity(str, Enum):
@@ -140,9 +140,54 @@ class AppIdentity(BaseModel):
     compat: str = "v1"
 
 
+class FrameScope(BaseModel):
+    """Required iframe for replay. SurfaceAdapter binds this; ReplayEngine does not."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["iframe"] = "iframe"
+    selector: str
+
+
+class OverlaySurface(BaseModel):
+    """Host/frame specialization. Policy/allowlist stay on the base capability."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entry_url: str | None = None
+    frame_scope: FrameScope | None = None
+
+
+class StepOverride(BaseModel):
+    """Presentation overlay for an existing step id. Cannot add steps or change then."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str | None = None
+    target: Target | None = None
+    checkpoint: Checkpoint | None = None
+    handler_when_text: dict[str, str] = Field(default_factory=dict)
+
+
 class TenantOverlay(BaseModel):
+    """Closed sidecar overlay: surface tokens only. Pins are required at apply time.
+
+    Replay-time locator/checkpoint misses against an applied overlay are an
+    observed failure of this pinned overlay contract: hard_failure with code
+    surface_mismatch (not a vendor-version claim, not business_outcome).
+    Apply-time pin/unknown-step failures use capability_drift.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str | None = None
     id: str | None = None
-    overrides: dict[str, Any] = Field(default_factory=dict)
+    base_capability_id: str | None = None
+    base_version: str | None = None
+    app_compat: str | None = None
+    surface: OverlaySurface | None = None
+    step_overrides: dict[str, StepOverride] = Field(default_factory=dict)
+    success: Checkpoint | None = None
 
 
 class Provenance(BaseModel):

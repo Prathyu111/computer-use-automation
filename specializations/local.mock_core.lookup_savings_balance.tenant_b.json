@@ -1,0 +1,75 @@
+{
+  "schema_version": "tenant_overlay/v1",
+  "id": "local.mock_core.lookup_savings_balance.tenant_b",
+  "base_capability_id": "local.mock_core.lookup_savings_balance",
+  "base_version": "1.0.0",
+  "app_compat": "v1",
+  "surface": {
+    "entry_url": "http://127.0.0.1:8765/tenant-b/",
+    "frame_scope": {
+      "kind": "iframe",
+      "selector": "iframe[name=\"legacyCore\"]"
+    }
+  },
+  "step_overrides": {
+    "s3_type": {
+      "target": {
+        "intent": "Enter the member ID to look up",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "a11y",
+            "role": "textbox",
+            "name": "Customer Number"
+          },
+          {
+            "kind": "labeled_control",
+            "label": "Customer Number"
+          }
+        ]
+      }
+    },
+    "s4_click": {
+      "target": {
+        "intent": "Click the Search button to look up the member",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "a11y",
+            "role": "button",
+            "name": "Find Member"
+          },
+          {
+            "kind": "labeled_control",
+            "label": "Find Member"
+          }
+        ]
+      },
+      "handler_when_text": {
+        "validation_rejected": "Customer Number is required"
+      }
+    },
+    "s5_extract": {
+      "target": {
+        "intent": "Extract the current savings balance",
+        "match": "one",
+        "strategies": [
+          {
+            "kind": "labeled_readonly",
+            "label": "Share Savings"
+          },
+          {
+            "kind": "structural",
+            "row_key": "Share Savings",
+            "target_cell": 1
+          }
+        ]
+      }
+    }
+  },
+  "success": {
+    "description": "Account details with share savings row",
+    "heading_contains": "Account Details",
+    "text_contains": "Share Savings"
+  }
+}

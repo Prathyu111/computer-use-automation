@@ -6,7 +6,7 @@ Raw discovery and replay runs are retained locally under `evidence/discover-*` a
 
 All member identifiers, names, balances, and account information used by the local mock are **synthetic test data** and do not represent real customers.
 
-## Seven published runs
+## Published runs
 
 | Directory | Demonstrates |
 | --- | --- |
@@ -17,8 +17,12 @@ All member identifiers, names, balances, and account information used by the loc
 | `public/replay-95e754bb/` | `session_expired` hard failure |
 | `public/replay-a46f4e20/` | Current same-session HITL → success with operator-reported `human_action` (structured logs; screenshots omitted) |
 | `public/replay-df9e8123/` | Historical same-session HITL → success (no `human_action`; structured logs; screenshots omitted) |
+| `public/replay-b3c17d08/` | Headed-browser Tenant A success on the canonical capability (no overlay) |
+| `public/replay-a37cd7d5/` | Headed-browser Tenant B success: **same** canonical capability + reviewed `TenantOverlay` (`overlay_id` on `start`). **Not** LLM-discovered |
 
 Replay logs contain no LLM decision loop. `result.json` `evidence_ref` values still name the original local `evidence/replay-*` paths; the published copies live under `evidence/public/`.
+
+Tenant B is deterministic reviewed surface specialization of `local.mock_core.lookup_savings_balance` v1.0.0. Negative-control (canonical on Tenant B without overlay) and drift (`surface_mismatch`) cases are **automated tests** in `tests/test_tenant_b_replay.py`, not curated manual runs.
 
 ## Screenshot policy
 
@@ -27,6 +31,7 @@ Screenshots are not automatically pixel-redacted. Public inclusion is conservati
 - Included: `public/replay-95e754bb/hard_failure.png` (session expired; Member ID field empty).
 - Omitted: `business_outcome.png` from replay-c4d0861b (identifier visible). Replay still screenshots non-success locally.
 - Omitted: `hitl_before.png` and `hitl_after.png` from replay-a46f4e20 and replay-df9e8123 (identifier visible). Those files remain in the raw local runs.
+- Omitted: any success-path screenshots from replay-b3c17d08 and replay-a37cd7d5 (filled identifiers / account grids). Structured `result.json` + `replay.jsonl` are the public proof.
 - Current HITL public proof is `replay-a46f4e20`: JSONL sequence (escalate → `hitl_request` lock=human → `human_action` actor=human → `hitl_resume` → `hitl_after` lock=agent → retry → extract → success) plus `intervention_request.json`. `replay-df9e8123` is the historical snapshot without `human_action`. Individual browser clicks during takeover are not recorded.
 
 ## Public discovery snapshot vs canonical capability
@@ -55,4 +60,8 @@ evidence/public/replay-a46f4e20/intervention_request.json
 evidence/public/replay-df9e8123/result.json
 evidence/public/replay-df9e8123/replay.jsonl
 evidence/public/replay-df9e8123/intervention_request.json
+evidence/public/replay-b3c17d08/result.json
+evidence/public/replay-b3c17d08/replay.jsonl
+evidence/public/replay-a37cd7d5/result.json
+evidence/public/replay-a37cd7d5/replay.jsonl
 ```

@@ -137,6 +137,139 @@ def summary(member_id: str, rec: dict) -> bytes:
     return _page("Account summary", "Account summary", body)
 
 
+def tenant_b_shell(iframe_src: str) -> bytes:
+    """Host chrome with the legacy core inside a named iframe. Tenant A `/` is unchanged."""
+    html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Eastbridge hosted core</title>
+  <style>
+    body {{ font-family: Tahoma, sans-serif; background: #cfc8b8; margin: 0; }}
+    .top {{ background: #3d2b1f; color: #fff; padding: 8px 16px; }}
+    iframe {{ width: 100%; height: 640px; border: 2px solid #333; background: #fff; }}
+  </style>
+</head>
+<body>
+  <div class="top">Eastbridge Credit Union — hosted core (legacy)</div>
+  <iframe name="legacyCore" src="{iframe_src}" title="Legacy core"></iframe>
+</body>
+</html>
+"""
+    return html.encode("utf-8")
+
+
+def tenant_b_core_form(message: str | None = None) -> bytes:
+    banner = f'<div class="banner">{message}</div>' if message else ""
+    body = f"""
+    {banner}
+    <table class="entry">
+      <tr>
+        <td>Customer Number</td>
+        <td><input aria-label="Customer Number" name="customer_number" size="16"/></td>
+      </tr>
+      <tr>
+        <td colspan="2"><button type="button" name="find_member">Find Member</button></td>
+      </tr>
+    </table>
+    <p>Enter the customer number from the servicing ticket.</p>
+    <script>
+      (function () {{
+        var btn = document.querySelector('button[name=find_member]');
+        if (!btn) return;
+        btn.addEventListener('click', function () {{
+          var v = document.querySelector('input[name=customer_number]').value;
+          location = '/tenant-b/core?customer_number=' + encodeURIComponent(v);
+        }});
+      }})();
+    </script>
+    """
+    return _page("Account Details", "Member search", body)
+
+
+def tenant_b_summary(member_id: str, rec: dict) -> bytes:
+    body = f"""
+    <table class="grid">
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Customer Number</td><td>{member_id}</td></tr>
+      <tr><td>Name</td><td>{rec['name']}</td></tr>
+      <tr><td>Share Savings</td><td>{rec['savings']}</td></tr>
+    </table>
+    """
+    return _page("Account Details", "Account Details", body)
+
+
+def tenant_b_drift_core() -> bytes:
+    """Incompatible Tenant B inner surface: heading Account Home, no Find Member."""
+    body = """
+    <table class="entry">
+      <tr>
+        <td>Customer Number</td>
+        <td><input aria-label="Customer Number" name="customer_number" size="16"/></td>
+      </tr>
+      <tr>
+        <td colspan="2"><button type="button" name="continue">Continue</button></td>
+      </tr>
+    </table>
+    <p>Account home does not expose member find on this host.</p>
+    """
+    return _page("Account Home", "Account Home", body)
+
+
+def tenant_b_checkpoint_drift_core(message: str | None = None) -> bytes:
+    """Find Member present, heading Account Home (checkpoint-only mismatch)."""
+    banner = f'<div class="banner">{message}</div>' if message else ""
+    body = f"""
+    {banner}
+    <table class="entry">
+      <tr>
+        <td>Customer Number</td>
+        <td><input aria-label="Customer Number" name="customer_number" size="16"/></td>
+      </tr>
+      <tr>
+        <td colspan="2"><button type="button" name="find_member">Find Member</button></td>
+      </tr>
+    </table>
+    <p>Account home still exposes member find on this host.</p>
+    <script>
+      (function () {{
+        var btn = document.querySelector('button[name=find_member]');
+        if (!btn) return;
+        btn.addEventListener('click', function () {{
+          var v = document.querySelector('input[name=customer_number]').value;
+          location = '/tenant-b/checkpoint-drift/core?customer_number=' + encodeURIComponent(v);
+        }});
+      }})();
+    </script>
+    """
+    return _page("Account Home", "Account Home", body)
+
+
+def tenant_b_checkpoint_drift_summary(member_id: str, rec: dict) -> bytes:
+    body = f"""
+    <table class="grid">
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td>Customer Number</td><td>{member_id}</td></tr>
+      <tr><td>Name</td><td>{rec['name']}</td></tr>
+      <tr><td>Share Savings</td><td>{rec['savings']}</td></tr>
+    </table>
+    """
+    return _page("Account Home", "Account Home", body)
+
+
+def _tenant_b_lookup_response(member_id: str) -> bytes:
+    if member_id == "":
+        return tenant_b_core_form("Customer Number is required.")
+    if member_id == "40301":
+        return tenant_b_core_form("You do not have permission to view this member.")
+    if member_id == "00000":
+        return tenant_b_core_form("Session expired. Please sign in again.")
+    rec = MEMBERS.get(member_id)
+    if not rec:
+        return tenant_b_core_form(f"No member found for {member_id}.")
+    return tenant_b_summary(member_id, rec)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         return
@@ -165,6 +298,39 @@ class Handler(BaseHTTPRequestHandler):
                 self._ok(lookup_form(f"No member found for {member_id}."))
                 return
             self._ok(summary(member_id, rec))
+            return
+        if path in {"/tenant-b", "/tenant-b/"}:
+            self._ok(tenant_b_shell("/tenant-b/core"))
+            return
+        if path in {"/tenant-b/drift", "/tenant-b/drift/"}:
+            self._ok(tenant_b_shell("/tenant-b/drift/core"))
+            return
+        if path in {"/tenant-b/drift/core", "/tenant-b/drift/core/"}:
+            self._ok(tenant_b_drift_core())
+            return
+        if path in {"/tenant-b/checkpoint-drift", "/tenant-b/checkpoint-drift/"}:
+            self._ok(tenant_b_shell("/tenant-b/checkpoint-drift/core"))
+            return
+        if path in {"/tenant-b/checkpoint-drift/core", "/tenant-b/checkpoint-drift/core/"}:
+            if "customer_number" not in qs:
+                self._ok(tenant_b_checkpoint_drift_core())
+                return
+            member_id = (qs.get("customer_number") or [""])[0].strip()
+            if member_id == "":
+                self._ok(tenant_b_checkpoint_drift_core("Customer Number is required."))
+                return
+            rec = MEMBERS.get(member_id)
+            if not rec:
+                self._ok(tenant_b_checkpoint_drift_core(f"No member found for {member_id}."))
+                return
+            self._ok(tenant_b_checkpoint_drift_summary(member_id, rec))
+            return
+        if path in {"/tenant-b/core", "/tenant-b/core/"}:
+            if "customer_number" not in qs:
+                self._ok(tenant_b_core_form())
+                return
+            member_id = (qs.get("customer_number") or [""])[0].strip()
+            self._ok(_tenant_b_lookup_response(member_id))
             return
         if path == "/health":
             self._ok(b"ok")

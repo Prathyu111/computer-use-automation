@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from cua.adapter import SurfaceAdapter
+from cua.adapter import SurfaceAdapter, SurfaceMismatchError
 from cua.evidence import EvidenceSink
 from cua.hitl import HumanIntervention
 from cua.models import (
@@ -114,19 +114,22 @@ class ReplayEngine:
             if off is not None:
                 return off
 
-        if not self.adapter.checkpoint_ok(
-            self.cap.success.heading_contains,
-            self.cap.success.text_contains,
-            self.cap.success.url_contains,
-        ):
-            obs = self.adapter.observe()
-            return self._result(
-                ResultKind.hard_failure,
-                "failed",
-                "terminal checkpoint failed",
-                expected=self.cap.success.description,
-                observed=obs.heading or obs.body_text[:200],
-            )
+        try:
+            if not self.adapter.checkpoint_ok(
+                self.cap.success.heading_contains,
+                self.cap.success.text_contains,
+                self.cap.success.url_contains,
+            ):
+                obs = self.adapter.observe()
+                return self._result(
+                    ResultKind.hard_failure,
+                    "failed",
+                    "terminal checkpoint failed",
+                    expected=self.cap.success.description,
+                    observed=obs.heading or obs.body_text[:200],
+                )
+        except (SurfaceMismatchError, LookupError) as exc:
+            return self._fail_lookup(None, "terminal checkpoint failed", exc)
         try:
             safe_outputs = self._finalize_outputs()
         except ValueError as exc:
@@ -139,6 +142,8 @@ class ReplayEngine:
         if step.action == "dismiss":
             try:
                 status = self.adapter.try_dismiss()
+            except SurfaceMismatchError as exc:
+                return self._fail(step, "dismiss failed", str(exc), code="surface_mismatch")
             except Exception as exc:
                 return self._fail(step, "dismiss failed", str(exc))
             self.evidence.log("dismiss", step=step.id, status=status)
@@ -152,11 +157,17 @@ class ReplayEngine:
                 key=step.key,
                 timeout_ms=step.timeout_ms,
             )
+        except SurfaceMismatchError as exc:
+            return self._fail(step, "act failed", str(exc), code="surface_mismatch")
         except Exception as exc:
             handled = self._apply_handlers(step, error=str(exc))
             if handled is not None:
                 return handled
-            return self._fail(step, "act failed", str(exc))
+            return self._fail(
+                step,
+                "act failed",
+                str(exc),
+            )
 
         if step.extract_to and extracted is not None:
             self.outputs[step.extract_to] = extracted
@@ -168,7 +179,17 @@ class ReplayEngine:
         if _meaningful_checkpoint(step.checkpoint):
             cp = step.checkpoint
             assert cp is not None
-            if self.adapter.checkpoint_ok(cp.heading_contains, cp.text_contains, cp.url_contains):
+            try:
+                ok = self.adapter.checkpoint_ok(cp.heading_contains, cp.text_contains, cp.url_contains)
+            except SurfaceMismatchError as exc:
+                return self._fail(step, cp.description or "checkpoint", str(exc), code="surface_mismatch")
+            except LookupError as exc:
+                return self._fail(
+                    step,
+                    cp.description or "checkpoint",
+                    str(exc),
+                )
+            if ok:
                 return None
             handled = self._apply_handlers(step, checkpoint_failed=True)
             if handled is not None:
@@ -250,9 +271,16 @@ class ReplayEngine:
                 if step.extract_to and extracted is not None:
                     self.outputs[step.extract_to] = extracted
                 return None
+            except SurfaceMismatchError as exc:
+                last = str(exc)
+                return self._fail(step, "recovery exhausted", last, code="surface_mismatch")
             except Exception as exc:
                 last = str(exc)
-        return self._fail(step, "recovery exhausted", last)
+        return self._fail(
+            step,
+            "recovery exhausted",
+            last,
+        )
 
     def _when_matches(
         self,
@@ -316,11 +344,25 @@ class ReplayEngine:
             return None
         return self._fail(step, "origin allowlist after navigation", url)
 
-    def _fail(self, step: Step, expected: str, observed: str) -> RunResult:
+    def _fail_lookup(self, step: Step | None, expected: str, exc: BaseException) -> RunResult:
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str) or not code:
+            code = "failed"
+        if step is None:
+            return self._result(
+                ResultKind.hard_failure,
+                code,
+                str(exc),
+                expected=expected,
+                observed=str(exc),
+            )
+        return self._fail(step, expected, str(exc), code=code)
+
+    def _fail(self, step: Step, expected: str, observed: str, *, code: str | None = None) -> RunResult:
         self._snapshot("failure")
         return self._result(
             ResultKind.hard_failure,
-            "failed",
+            code or "failed",
             observed,
             step=step,
             expected=expected,

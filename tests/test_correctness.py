@@ -133,6 +133,7 @@ def test_replay_business_vs_hard_failure(mock_server, tmp_path):
     path.write_text(broken.model_dump_json(), encoding="utf-8")
     hard = orch.invoke(path, {"memberId": "12345"})
     assert hard.kind is ResultKind.hard_failure
+    assert hard.code == "failed"
 
 
 def test_checkpoint_url_is_enforced(mock_server, tmp_path):

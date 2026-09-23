@@ -36,6 +36,11 @@ def main(argv: list[str] | None = None) -> None:
         help="key=value (repeatable), e.g. --input memberId=12345",
     )
     p_inv.add_argument("--start-mock", action="store_true", help="Start mock core in-process")
+    p_inv.add_argument(
+        "--overlay",
+        default=None,
+        help="Optional TenantOverlay JSON sidecar (presentation/surface only)",
+    )
 
     args = parser.parse_args(argv)
     if args.cmd == "mock-server":
@@ -59,7 +64,8 @@ def main(argv: list[str] | None = None) -> None:
                 raise SystemExit(f"invalid --input {item!r}, expected key=value")
             k, v = item.split("=", 1)
             params[k] = v
-        result = orch.invoke(Path(args.capability), params)
+        overlay_path = Path(args.overlay) if args.overlay else None
+        result = orch.invoke(Path(args.capability), params, overlay_path=overlay_path)
         print(json.dumps(result.model_dump(), indent=2))
         if result.kind.value in {"hard_failure"}:
             sys.exit(1)

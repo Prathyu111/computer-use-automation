@@ -8,7 +8,7 @@ Every mutation is: **proposed or recorded action → policy gate → session con
 
 This slice demonstrates that architecture for one **lookup-savings-balance** family on a local mock core. The compiler is specialized to that family (parameterized member id, ranked locators from the working role+name, declared Search handlers). It is not a general “compile any app” product.
 
-The published path is genuine LLM discovery → exploratory successful trace → compiler normalization → reviewed compiler specialization → canonical capability → deterministic no-LLM replay. Compiler-owned error handlers are reviewed specialization, not claimed as LLM-discovered.
+The published path is genuine LLM discovery → exploratory successful trace → compiler normalization → reviewed compiler specialization → canonical capability → deterministic no-LLM replay. Compiler-owned error handlers are reviewed specialization, not claimed as LLM-discovered. A reviewed `TenantOverlay` sidecar may be applied in the orchestrator (deep copy) **before** replay; the replay engine stays tenant-blind. Overlay locators are not LLM-discovered.
 
 HITL entry points: discovery `stuck` and `act_failed`; replay **handler escalate**; policy **irreversible** (`require_hitl`) in either mode if classified. Unresolved locator on replay is `hard_failure`, not HITL. Exhausting discovery `--max-steps` raises `CompileError`, not HITL. The operator takes and returns **the same live browser session**. CLI verbs remain `resume` / `done` / `abort`; an operator-reported UI action (not an inferred click) may be logged as `human_action` while `lock=human`. Evidence is a dotted sink (JSONL; screenshot on non-success plus HITL before/after locally), not on the act path.
 
@@ -20,7 +20,7 @@ Caller-facing `RunResult`: `success` | `business_outcome` | `hard_failure` | `es
 
 `capability/v1` is an RPC contract plus a linear procedure:
 
-- Identity: `id`, `version`, `app` (vendor/product/surfaceKind), optional `tenant` overlay (schema-ready, not a platform).
+- Identity: `id`, `version`, `app` (vendor/product/surfaceKind), optional in-memory `tenant` after overlay apply (closed sidecar JSON, not a tenant platform).
 - Contract: typed `inputs` / `outputs` with `sensitivity`; closed `outcomes` including `member_not_found`.
 - Steps: semantic actions; each control is a **ranked locator bundle** (a11y → labeled control → structural → css last).
 - Handlers: deterministic `when` / `then` (return outcome, recover, escalate, fail).
@@ -54,13 +54,17 @@ Runtime errors are classified by **declared handlers**, not by the model:
 
 Known declared conditions may recover or escalate per artifact handlers. Unresolved or unrecognized states with no matching rule fail closed (`hard_failure`) rather than improvising.
 
-Clean success without that Search recover path: `evidence/public/replay-1c9f10a2`. Genuine discovery: `evidence/public/discover-f83a7518`.
+Clean success without that Search recover path: `evidence/public/replay-1c9f10a2`. Headed Tenant A canonical success: `evidence/public/replay-b3c17d08`. Genuine discovery: `evidence/public/discover-f83a7518`. Overlay contract miss (required iframe / specialized locator or checkpoint) is `hard_failure` / `surface_mismatch` — not `business_outcome`, not vendor-version proof. Those cases are tests (`tests/test_tenant_b_replay.py`), not curated manual runs.
 
 ## 4. Heterogeneity & multi-tenant
 
-The capability speaks **semantic actions + locator intents**. Playwright lives only in the web adapter. A desktop adapter could implement the same `observe` / `act` / `resolve` surface using the OS accessibility tree without changing step language.
+The capability speaks **semantic actions + locator intents**. Playwright lives only in the web adapter. A desktop adapter is not built; the same `observe` / `act` / `resolve` surface could theoretically use an OS accessibility tree without changing step language. This slice does not claim desktop or generic legacy-app support.
 
-Multi-tenant: the base artifact is the vendor product. A tenant overlay (unused in code) may replace locators, interstitial copy, and resolved host **by step id**. It must not change inputs, outputs, or outcome codes — that is a new `version`. Drift is a checkpoint failure after overlay locators; fix the overlay or the broken step, do not re-record per institution.
+Demonstrated mechanism: **one discovered logical capability** + **reviewed surface specialization** → **deterministic execution on a structurally different tenant**. Canonical `local.mock_core.lookup_savings_balance` v1.0.0 (provenance `discover-f83a7518`) is unchanged. Tenant A uses it directly (`evidence/public/replay-b3c17d08`). Tenant B uses the same file plus sidecar `specializations/local.mock_core.lookup_savings_balance.tenant_b.json` (`evidence/public/replay-a37cd7d5`, `overlay_id` on `start`). Tenant B was not LLM-discovered. Neither replay calls a model.
+
+Tenant B presentation (this mock only): iframe `legacyCore`, table layout, Customer Number / Find Member / Account Details / Share Savings. `apply_overlay` deep-copies the base, then applies entry, locators, presentation checkpoints, and handler *match* text. Pins (`base_capability_id`, `base_version`, `app_compat`) and unknown step ids fail as `capability_drift`. Closed schema (`extra="forbid"`) rejects semantic overrides (`action`, handler `then`). Overlay cannot change workflow order, I/O contract, risk/policy, handler outcome semantics, or provenance.
+
+`SurfaceAdapter` owns `frame_scope`. If a required iframe cannot be bound, there is **no parent-DOM fallback**. `ReplayEngine` has no Tenant B strings. Unsupported specialized-surface assumptions fail closed as `hard_failure` / `surface_mismatch` (observed surface failed the **pinned overlay contract**, not a vendor software-version claim). Negative-control (canonical on Tenant B without overlay) and locator/checkpoint drift are **automated tests** in `tests/test_tenant_b_replay.py`, not manual evidence. Headed Tenant B success is the curated replay above. This is not arbitrary tenant adaptation or automatic rediscovery.
 
 ## 5. Escalation & handoff
 
@@ -80,6 +84,6 @@ Screenshots: replay captures a PNG on **non-success** (`business_outcome`, `hard
 
 ## 7. Cuts
 
-Not built: queues, desktop adapter, tenant overlay runtime, co-browse console, approval catalog, LLM fallback on replay, code generation, automatic pixel redaction.
+Not built: queues, desktop adapter, co-browse console, approval catalog, LLM fallback on replay, code generation, automatic pixel redaction, arbitrary-tenant or generic-legacy compilation.
 
-Bounded single-step recovery **is built** and shown by `evidence/public/replay-2503214d` (Search notice dismiss, then success). Next: overlay apply-by-step-id, capability catalog endpoint for a calling agent.
+Bounded single-step recovery **is built** (`evidence/public/replay-2503214d`). Overlay apply-by-step-id **is built** for this one reviewed Tenant B sidecar. Next: capability catalog endpoint for a calling agent.

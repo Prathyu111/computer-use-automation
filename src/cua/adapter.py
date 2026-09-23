@@ -6,9 +6,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from playwright.sync_api import Locator, Page, TimeoutError as PlaywrightTimeout
+from playwright.sync_api import Frame, Locator, Page, TimeoutError as PlaywrightTimeout
 
-from cua.models import LocatorStrategy, ProposedAction, Target
+from cua.models import FrameScope, LocatorStrategy, ProposedAction, Target
 from cua.redact import redact_for_log, redact_text
 
 
@@ -23,19 +23,39 @@ class ObserveResult:
     labeled_fields: list[dict[str, Any]] = field(default_factory=list)
 
 
+class SurfaceMismatchError(LookupError):
+    """Required overlay surface/frame contract unsatisfied. Fail closed.
+
+    Replay maps this to kind=hard_failure, code=surface_mismatch.
+    It is not business_outcome and is not a vendor-version claim.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.code = "surface_mismatch"
+
+
 class SurfaceAdapter:
-    def __init__(self, page: Page) -> None:
+    def __init__(
+        self,
+        page: Page,
+        frame_scope: FrameScope | None = None,
+        surface_contract: bool = False,
+    ) -> None:
         self.page = page
+        self.frame_scope = frame_scope
+        self.surface_contract = surface_contract
 
     def observe(self) -> ObserveResult:
+        root = self._root()
         heading = ""
         try:
-            heading = self.page.locator("h1, h2").first.inner_text(timeout=1000)
+            heading = root.locator("h1, h2").first.inner_text(timeout=1000)
         except Exception:
             heading = ""
         body = ""
         try:
-            body = self.page.locator("body").inner_text(timeout=2000)
+            body = root.locator("body").inner_text(timeout=2000)
         except Exception:
             body = ""
         controls: list[dict[str, Any]] = []
@@ -43,7 +63,7 @@ class SurfaceAdapter:
             ("textbox", "input:not([type='hidden']), textarea"),
             ("button", "button, input[type='submit']"),
         ):
-            loc = self.page.locator(selector)
+            loc = root.locator(selector)
             count = min(loc.count(), 20)
             for i in range(count):
                 el = loc.nth(i)
@@ -58,15 +78,15 @@ class SurfaceAdapter:
                     control["filled"] = self._control_is_filled(el)
                 controls.append(control)
         dialog = None
-        overlay = self.page.locator(".overlay, [role='alertdialog'], dialog")
+        overlay = root.locator(".overlay, [role='alertdialog'], dialog")
         try:
             if overlay.count() and overlay.first.is_visible():
                 dialog = overlay.first.inner_text(timeout=1000)[:400]
         except Exception:
             dialog = None
         return ObserveResult(
-            url=self.page.url,
-            title=self.page.title(),
+            url=root.url,
+            title=root.title(),
             heading=heading.strip(),
             body_text=body[:4000],
             controls=controls,
@@ -111,16 +131,10 @@ class SurfaceAdapter:
                 return None
             if action.type == "click":
                 loc.click()
-                try:
-                    self.page.wait_for_load_state("domcontentloaded", timeout=5000)
-                except Exception:
-                    pass
+                self._wait_dom()
                 if self.try_dismiss() == "dismissed":
                     loc.click()
-                    try:
-                        self.page.wait_for_load_state("domcontentloaded", timeout=5000)
-                    except Exception:
-                        pass
+                    self._wait_dom()
                 return None
             return loc.inner_text().strip()
         raise ValueError(f"unsupported proposed action {action.type}")
@@ -151,10 +165,7 @@ class SurfaceAdapter:
         )
         if action == "click":
             loc.click()
-            try:
-                self.page.wait_for_load_state("domcontentloaded", timeout=5000)
-            except Exception:
-                pass
+            self._wait_dom()
             return None
         if action in {"type", "clear_and_type"}:
             loc.fill(value or "")
@@ -191,24 +202,37 @@ class SurfaceAdapter:
                     errors.append(f"{tag}: unique match is not clickable")
                     continue
                 return chosen
+            except SurfaceMismatchError:
+                raise
             except PlaywrightTimeout:
                 errors.append(f"{tag}: timeout")
             except Exception as exc:
                 errors.append(f"{tag}: {exc}")
         tried = _unique_strategy_locator_names(target.strategies)
-        raise LookupError(
-            f"could not uniquely resolve '{tried}': " + "; ".join(errors)
-        )
+        message = f"could not uniquely resolve '{tried}': " + "; ".join(errors)
+        err = LookupError(message)
+        if self.surface_contract:
+            raise SurfaceMismatchError(message) from err
+        raise err
 
     def checkpoint_ok(self, heading_contains: str | None, text_contains: str | None, url_contains: str | None) -> bool:
         obs = self.observe()
         if heading_contains and heading_contains.lower() not in obs.heading.lower():
-            return False
+            return self._checkpoint_result(False, heading_contains, obs.heading)
         if text_contains and text_contains.lower() not in obs.body_text.lower():
-            return False
+            return self._checkpoint_result(False, text_contains, obs.body_text[:200])
         if url_contains and url_contains.lower() not in obs.url.lower():
-            return False
+            return self._checkpoint_result(False, url_contains, obs.url)
         return True
+
+    def _checkpoint_result(self, ok: bool, expected: str | None, observed: str) -> bool:
+        if ok:
+            return True
+        if self.surface_contract:
+            raise SurfaceMismatchError(
+                f"required surface checkpoint unsatisfied: expected {expected!r}, observed {observed!r}"
+            )
+        return False
 
     def text_matches(self, text: str) -> bool:
         return text.lower() in self.observe().body_text.lower()
@@ -216,12 +240,13 @@ class SurfaceAdapter:
     def try_dismiss(self) -> str:
         """Return 'dismissed' or 'absent'. Raise on automation failure."""
         try:
+            root = self._root()
             for name in ("OK", "Dismiss", "Close", "Got it"):
-                btn = self.page.get_by_role("button", name=re.compile(name, re.I))
+                btn = root.get_by_role("button", name=re.compile(name, re.I))
                 if btn.count() and btn.first.is_visible():
                     btn.first.click()
                     return "dismissed"
-            overlay_btn = self.page.locator(".overlay button")
+            overlay_btn = root.locator(".overlay button")
             if overlay_btn.count() and overlay_btn.first.is_visible():
                 overlay_btn.first.click()
                 return "dismissed"
@@ -305,35 +330,37 @@ class SurfaceAdapter:
         return bool(info)
 
     def _locator_for(self, strategy: LocatorStrategy) -> Locator:
+        root = self._root()
         if strategy.kind == "a11y":
             role = strategy.role or "button"
             kwargs: dict[str, Any] = {}
             if strategy.name:
                 kwargs["name"] = strategy.name
-            return self.page.get_by_role(role, **kwargs)
+            return root.get_by_role(role, **kwargs)
         if strategy.kind == "labeled_control":
             return self._labeled_editable(strategy.label or strategy.name or "")
         if strategy.kind == "labeled_readonly":
             return self._labeled_readonly(strategy.label or strategy.name or strategy.text or "")
         if strategy.kind == "name_in_scope":
             text = strategy.text or strategy.name or ""
-            return self.page.get_by_text(re.compile(text, re.I))
+            return root.get_by_text(re.compile(text, re.I))
         if strategy.kind == "structural":
             key = strategy.row_key or ""
-            row = self.page.locator("tr").filter(has_text=re.compile(key, re.I))
+            row = root.locator("tr").filter(has_text=re.compile(key, re.I))
             cell = strategy.target_cell if strategy.target_cell is not None else 1
             return row.locator("td").nth(cell)
         if strategy.kind == "css" and strategy.css:
-            return self.page.locator(strategy.css)
+            return root.locator(strategy.css)
         raise ValueError(f"unknown strategy {strategy.kind}")
 
     def _labeled_editable(self, label: str) -> Locator:
         """Associate visible label/table-header text with a unique nearby editable control."""
+        root = self._root()
         exact = re.compile(rf"^{re.escape(label)}$", re.I)
-        by_label = self.page.get_by_label(label, exact=False)
+        by_label = root.get_by_label(label, exact=False)
         if by_label.count() == 1:
             return by_label
-        cells = self.page.locator("th, td, label").filter(has_text=exact)
+        cells = root.locator("th, td, label").filter(has_text=exact)
         if cells.count() == 1:
             row_editables = cells.locator("xpath=ancestor::tr[1]").locator(
                 "input:not([type='hidden']):not([type='submit']):not([type='button']), "
@@ -346,11 +373,12 @@ class SurfaceAdapter:
             )
             if following.count() == 1:
                 return following
-        return self.page.locator("[data-cua-unresolved-labeled-control]")
+        return root.locator("[data-cua-unresolved-labeled-control]")
 
     def _labeled_readonly(self, label: str) -> Locator:
         """Unique labeled read-only field, including table-style label → adjacent value."""
-        unresolved = self.page.locator("[data-cua-unresolved-labeled-readonly]")
+        root = self._root()
+        unresolved = root.locator("[data-cua-unresolved-labeled-readonly]")
         if not label:
             return unresolved
         exact = re.compile(rf"^{re.escape(label)}$", re.I)
@@ -368,7 +396,7 @@ class SurfaceAdapter:
 
     def _labeled_readonly_pairs(self) -> list[dict[str, Any]]:
         try:
-            pairs = self.page.evaluate(
+            pairs = self._root().evaluate(
                 """() => {
                   const seen = new Map();
                   const dup = new Set();
@@ -414,6 +442,45 @@ class SurfaceAdapter:
             if label and value:
                 cleaned.append({"label": label[:80], "value": value})
         return cleaned
+
+    def _wait_dom(self) -> None:
+        try:
+            self._root().wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception:
+            pass
+
+    def _root(self) -> Page | Frame:
+        """Scoped document root. No silent fallback to the parent page."""
+        if self.frame_scope is None:
+            return self.page
+        selector = self.frame_scope.selector
+        loc = self.page.locator(selector)
+        try:
+            loc.first.wait_for(state="attached", timeout=5000)
+            count = loc.count()
+        except PlaywrightTimeout as exc:
+            raise SurfaceMismatchError(
+                f"required iframe not bound ({selector!r}): not attached"
+            ) from exc
+        except Exception as exc:
+            raise SurfaceMismatchError(
+                f"required iframe not bound ({selector!r}): {exc}"
+            ) from exc
+        if count != 1:
+            raise SurfaceMismatchError(
+                f"required iframe not uniquely bound ({selector!r}): expected 1, got {count}"
+            )
+        handle = loc.first.element_handle()
+        if handle is None:
+            raise SurfaceMismatchError(
+                f"required iframe not bound ({selector!r}): no element handle"
+            )
+        frame = handle.content_frame()
+        if frame is None:
+            raise SurfaceMismatchError(
+                f"required iframe content unavailable ({selector!r})"
+            )
+        return frame
 
 
 def _need_for_action(action: str) -> str | None:
